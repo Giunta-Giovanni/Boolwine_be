@@ -109,19 +109,29 @@ function post(req, res) {
     connection.query(
         sendOrderSql,
         [totalPrice, fullName, email, phoneNumber, address, zipCode, country],
-        (err, sendOrderResult) => {
+        (err, result) => {
             if (err) {
                 // console err
                 console.error('database query failed:', err);
                 // response err
                 return res.status(500).json({ error: 'database query failed' });
-            }
-            // response: success message
+            };
+
+            const orderId = result.insertId;
+            console.log(orderId);
+
+
+
+
+
+
+
+
+            // response: success message + 201 status
             res.status(201);
-            res.json({ message: 'order added', })
-        }
-    )
-}
+            res.json({ message: 'order added' }); //DA RIVEDERE PER JSON MESSAGE
+        });
+};
 
 function modify(req, res) {
     res.send('questo è la rotta modify dellordine')
