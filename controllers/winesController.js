@@ -26,6 +26,7 @@ function index(req, res) {
             return res.status(404).json({ error: 'no wines found' });
         }
 
+        // update path image
         const wines = winesResults.map(wine => {
             wine.image = wine.image ? `${req.imagePath}${wine.image}` : "";
             return {
