@@ -62,23 +62,53 @@ function modify(req, res) {
     // save body info
     const { quantity } = req.body
 
-    //query creation
-    const boughtQuantitySql = `
+    const checkQuantitySql = `
+    SELECT quantity_in_stock 
+    FROM wines
+    WHERE id = ?
+    `
+    connection.query(checkQuantitySql, [id], (err, checkQuantityResult) => {
+        if (err) return res.status(500).json({ error: 'database query failed' });
+        if (checkQuantityResult.length === 0) {
+            return res.status(404).json({ error: 'quantity is not found' });
+        }
+        const currentQuantity = checkQuantityResult[0].quantity_in_stock
+
+        if (quantity > currentQuantity) {
+            return (
+                res.status(400).json({ error: 'not enough stock available ' })
+            )
+        }
+
+
+
+        //query creation
+        const boughtQuantitySql = `
     UPDATE wines
     SET quantity_in_stock = quantity_in_stock - ?
     where wines.id = ?
 `
-    // use query
-    connection.query(boughtQuantitySql, [quantity, id], (err, result) => {
-        if (err) return res.status(500).json({ error: 'Database query failed' });
+        // use query
+        connection.query(boughtQuantitySql, [quantity, id], (err, result) => {
+            if (err) return res.status(500).json({ error: 'Database query failed' });
+            // Bonus Andrew Think
+            const getWineNameSql = `
+        SELECT name 
+        FROM wines
+        WHERE id = ?
+        `
 
-        // confirm status with un JSON
-        res.status(200);
-        res.json({ message: `${quantity} bottle has been bought`, })
+            connection.query(getWineNameSql, [id], (err, nameResult) => {
+                if (err) return res.status(500).json({ error: 'Failed to fetch wine name' });
+                const wineName = nameResult[0].name;
+
+
+                // confirm status with un JSON
+                res.status(200);
+                res.json({ message: `${quantity} bottle(s) of ${wineName} has been bought`, })
+            })
+        })
     })
-
-
-
 
 }
 
