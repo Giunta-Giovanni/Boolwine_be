@@ -13,7 +13,7 @@ router.get('/', index);
 // show
 router.get('/:id', show);
 // post
-router.post('/:id', post);
+router.post('/', post);
 // modify
 router.patch('/:id', modify);
 

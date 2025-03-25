@@ -143,4 +143,4 @@ function show(req, res) {
 
 
 // EXPORT
-module.exports = { index, show };
+module.exports = { index, show, };
