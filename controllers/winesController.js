@@ -6,11 +6,11 @@ function index(req, res) {
 
     // create query: for both wines and their type
     const winesSql = `
-    SELECT 
-    wines.*,
-    types.name AS type
-    FROM wines
-    JOIN types ON types.id = wines.type_id
+        SELECT 
+        wines.*,
+        types.name AS type
+        FROM wines
+        JOIN types ON types.id = wines.type_id
     `
     // use query
     connection.query(winesSql, (err, winesResults) => {
