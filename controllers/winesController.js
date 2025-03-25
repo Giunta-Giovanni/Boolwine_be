@@ -26,8 +26,9 @@ function index(req, res) {
         })
         res.json(wines);
     })
-
 }
+
+// function show
 function show(req, res) {
     // save id req
     const { id } = req.params
@@ -54,8 +55,31 @@ function show(req, res) {
     })
 
 }
+// function modify
 function modify(req, res) {
-    res.send('questa è la nostra rotta modify')
+    // save id req
+    const { id } = req.params
+    // save body info
+    const { quantity } = req.body
+
+    //query creation
+    const boughtQuantitySql = `
+    UPDATE wines
+    SET quantity_in_stock = quantity_in_stock - ?
+    where wines.id = ?
+`
+    // use query
+    connection.query(boughtQuantitySql, [quantity, id], (err, result) => {
+        if (err) return res.status(500).json({ error: 'Database query failed' });
+
+        // confirm status with un JSON
+        res.status(200);
+        res.json({ message: `${quantity} bottle has been bought`, })
+    })
+
+
+
+
 }
 
 module.exports = { index, show, modify };
