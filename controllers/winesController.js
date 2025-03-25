@@ -15,7 +15,16 @@ function index(req, res) {
     connection.query(winesSql, (err, winesResults) => {
         if (err) return res.status(500).json({ error: 'Database query failed' });
         // response
-        res.json(winesResults)
+        // res.json(winesResults)
+        const wines = winesResults.map(wine => {
+            // update path image
+            wine.image = wine.image ? `${req.imagePath}${wine.image}` : ""
+            return {
+                ...wine,
+                image: wine.image
+            }
+        })
+        res.json(wines);
     })
 
 }
@@ -35,8 +44,13 @@ function show(req, res) {
     connection.query(wineSql, [id], (err, wineResults) => {
         if (err) return res.status(500).json({ error: 'Database query failed' })
         if (wineResults.length === 0) return res.status(404).json({ error: 'vino non trovato' });
+        const wine = wineResults[0];
+
+        // update path image
+        wine.image = wine.image ? `${req.imagePath}${wine.image}` : "";
         // response
-        res.json(wineResults[0]);
+        res.json(wine);
+
     })
 
 }
