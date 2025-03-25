@@ -1,0 +1,27 @@
+{
+  "name": "boolwine_be",
+  "version": "1.0.0",
+  "description": "App di backend per la nostra vendita di vini online",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --env-file=.env app.js",
+    "watch": "node --env-file=.env --watch app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Giunta-Giovanni/Boolwine_be.git"
+  },
+  "author": "Project-team-4",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Giunta-Giovanni/Boolwine_be/issues"
+  },
+  "homepage": "https://github.com/Giunta-Giovanni/Boolwine_be#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.2",
+    "mysql2": "^3.14.0"
+  }
+}
