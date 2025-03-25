@@ -3,15 +3,18 @@ const express = require('express');
 // activate express
 const router = express.Router();
 // import controllers
-const winesController = require('../controllers/winesController');
+const ordersController = require('../controllers/ordersController');
 // controllers destructuring
-const { index, show } = winesController
+const { index, show, post, modify } = ordersController
 
 // Crud Operations
 // index
 router.get('/', index);
 // show
 router.get('/:id', show);
-
+// post
+router.post('/:id', post);
+// modify
+router.patch('/:id', modify);
 
 module.exports = router;
