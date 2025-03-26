@@ -1,5 +1,5 @@
 // import connection
-const connection = require('../data/db')
+const connection = require('../data/db');
 
 // INDEX FUNCTION
 function index(req, res) {
@@ -10,15 +10,15 @@ function index(req, res) {
             orders.id,
             orders.order_date,
             orders.full_name,
-        GROUP_CONCAT(order_details.quantity) AS total_quantity,
-        GROUP_CONCAT(wines.name) AS wines_names
+            GROUP_CONCAT(order_details.quantity) AS total_quantity,
+            GROUP_CONCAT(wines.name) AS wines_names
         FROM orders
         JOIN order_details ON orders.id = order_details.order_id
         JOIN wines ON order_details.wine_id = wines.id
         GROUP BY orders.id, orders.order_date, orders.full_name;
-        `;
+    `;
 
-    // use query
+    // execute query
     connection.query(ordersSql, (err, ordersResults) => {
         if (err) {
             // console err
@@ -28,8 +28,8 @@ function index(req, res) {
         }
 
         if (ordersResults.length === 0) {
-            // response err
-            return res.status(404).json({ error: 'no orders found' });
+            // response: empty order list
+            return res.status(200).json({ message: 'empty order list' });
         }
 
         // response: all orders
@@ -43,7 +43,7 @@ function show(req, res) {
     // save id from req.params
     const { id } = req.params;
 
-    // create query: for both wines and their type
+    // create query: to see an order_details by its id
     const orderSql = `
         SELECT 
             orders.id,
@@ -55,9 +55,9 @@ function show(req, res) {
         JOIN order_details ON orders.id = order_details.order_id
         JOIN wines ON order_details.wine_id = wines.id
         WHERE orders.id = ?
-        `;
+    `;
 
-    // use query
+    // execute query
     connection.query(orderSql, [id], (err, orderResults) => {
         if (err) {
             // console err
@@ -67,11 +67,11 @@ function show(req, res) {
         }
 
         if (orderResults.length === 0) {
-            // response err
+            // response: no order found
             return res.status(404).json({ error: 'no order found' });
         }
 
-        // response: all orders
+        // response: order_details
         res.json(orderResults[0]);
     });
 }
@@ -84,8 +84,8 @@ function post(req, res) {
 
     // check if cart is empty
     if (!cart || cart.length === 0) {
-        console.error('cart is empty');
-        return res.status(400).json({ error: 'cart is empty' });
+        // response: cart is empty
+        return res.status(404).json({ error: 'cart is empty' });
     }
 
     // create query: insert order
@@ -102,55 +102,62 @@ function post(req, res) {
         VALUES (?, ?, ?, ?, ?, ?, ?);
     `;
 
-    // execute query: insert order
+    // execute query
     connection.query(sendOrderSql, [totalPrice, fullName, email, phoneNumber, address, zipCode, country], (err, result) => {
         if (err) {
+            // console err
             console.error('database query failed:', err);
+            // response err
             return res.status(500).json({ error: 'database query failed' });
         }
 
         // save order ID
         const orderId = result.insertId;
 
-        // prepare data for order_details table
+        // prepare values for order_details table
         const values = cart.map((item) => [orderId, item.wine_id, item.quantity]);
 
+        // create query: check stock
         const checkQuantitySql = `
         SELECT id, quantity_in_stock 
         FROM wines
         WHERE id IN (${cart.map(() => '?').join(',')})
     `;
 
+        // find wine id
         const wineIds = cart.map(item => item.wine_id);
 
-        // execute query: check stock
+        // execute query
         connection.query(checkQuantitySql, wineIds, (err, stockQuantitiesResult) => {
             if (err) {
-                console.error('Errore durante la verifica dello stock:', err);
-                return res.status(500).json({ error: 'Errore durante la verifica dello stock' });
+                // console err
+                console.error('failed to check stock:', err);
+                // response err
+                return res.status(500).json({ error: 'failed to check stock' });
             }
-            console.log(stockQuantitiesResult);
 
-            let hasInsufficientStock = false
+            // set state for insufficient stock
+            let hasInsufficientStock = false;
+
+            // for each wine check the quantity in stock
             stockQuantitiesResult.forEach(item => {
-                const { id, quantity_in_stock } = item
-                // se la quantità corrispondente all id del vino e minore di quella richiesta dall'ordine allora errore 403 forbidden
-                // const values = cart.map((item) => [orderId, item.wine_id, item.quantity]);
+                const { id, quantity_in_stock } = item;
+
+                // for each wine check the requested quantity
                 cart.forEach(cartItem => {
-                    const { wine_id, quantity } = cartItem
+                    const { wine_id, quantity } = cartItem;
 
-                    // creiamo una variabile dove salviamo un booleano true e false
-                    // se il booleano viene trasformato a true allora blocca il flusso 
-                    // altrimenti continua ed effettua il resto
+                    // check stock against order quantity
                     if (id === wine_id && quantity > quantity_in_stock) {
-                        res.status(403).json({ error: 'troppe bottiglie' })
-                        return hasInsufficientStock = true
+                        // response: requested quantity not available
+                        res.status(403).json({ error: 'requested quantity not available' });
+                        // change state for insufficient stock
+                        return hasInsufficientStock = true;
                     }
-                })
-
+                });
             });
 
-            // se ritorna vero blocca il processo
+            // if insufficient stock, stop process
             if (hasInsufficientStock) return;
 
             // create query: insert order details
@@ -158,10 +165,12 @@ function post(req, res) {
             INSERT INTO order_details (order_id, wine_id, quantity) VALUES ?;
         `;
 
-            // execute query: insert order details
+            // execute query
             connection.query(addDetailsOrderSql, [values], (err, result) => {
                 if (err) {
+                    // console err
                     console.error('failed to insert order details:', err);
+                    // response err
                     return res.status(500).json({ error: 'failed to insert order details' });
                 }
 
@@ -173,30 +182,29 @@ function post(req, res) {
                 WHERE order_details.order_id = ?;
             `;
 
-                // execute query: update stock
+                // execute query
                 connection.query(updateStockSql, [orderId], (err, result) => {
                     if (err) {
+                        // console err
                         console.error('failed to update stock:', err);
+                        // response err
                         return res.status(500).json({ error: 'failed to update stock' });
                     }
 
-                    // response: success message
+                    // console: order added & stock updated
                     console.log('order created & stock updated');
+                    // response: order added & stock updated
                     res.status(201).json({ order: `order number ${orderId} created`, stock: `stock updated` });
                 });
             });
         });
-    }
-
-    )
+    });
 }
 
-
+// UPDATE FUNCTION
 function modify(req, res) {
-    res.send('questo è la rotta modify dellordine')
-
+    res.send('this is the modify route for the order');
 }
 
 // EXPORT
 module.exports = { index, show, post, modify };
-
