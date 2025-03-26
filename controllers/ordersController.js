@@ -82,9 +82,11 @@ function post(req, res) {
     // save data from req.body
     const { totalPrice, fullName, email, phoneNumber, address, zipCode, country, cart } = req.body;
 
-
+    // check if cart is empty
     if (!cart || cart.length === 0) {
-        return res.status(400).json({ error: 'Il carrello è vuoto' });
+        // cart is empty
+        console.error('cart is empty:', err);
+        return res.status(400).json({ error: 'cart is empty' });
     }
 
     // create query: send order
@@ -138,18 +140,29 @@ function post(req, res) {
             VALUES ?
             `
 
-            connection.query(addDetailsOrderSql, [values], (err, result) => {
-                if (err) {
-                    console.error('Failed to insert order details:', err);
-                    return res.status(500).json({ error: 'Failed to insert order details' });
-                }
+            const updateStockSql =
+                `
+            UPDATE wines 
+            JOIN order_details ON wines.id = order_details.wine_id
+            SET wines.quantity_in_stock = wines.quantity_in_stock - order_details.quantity
+            WHERE order_details.order_id = ?;
+            `
 
-                res.status(201).json({ message: 'Order added successfully', orderId });
+            connection.query(addDetailsOrderSql, [values], (err, result) => {
+                if (err) return console.error(err);
+
+                connection.query(updateStockSql, [orderId], (err, result) => {
+                    if (err) return console.error(err);
+                    console.log("Stock aggiornato con successo.");
+                    res.status(201).json({ message: 'stock aggiornato con successo' })
+                });
             });
 
 
         });
 };
+
+
 
 function modify(req, res) {
     res.send('questo è la rotta modify dellordine')
@@ -162,12 +175,7 @@ module.exports = { index, show, post, modify };
 
 
 
-// -- Inserisce più vini nel carrello (ordine dettagliato)
-// INSERT INTO order_details (order_id, wine_id, quantity)
-// VALUES 
-// (@order_id, 12, 10),  -- 10 bottiglie di vino con ID 12
-// (@order_id, 7, 5),    -- 5 bottiglie di vino con ID 7
-// (@order_id, 3, 2);    -- 2 bottiglie di vino con ID 3
+
 
 // -- Aggiorna le quantità in stock per tutti i vini ordinati
 // UPDATE wines 
