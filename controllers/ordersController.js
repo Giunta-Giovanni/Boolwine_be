@@ -80,7 +80,12 @@ function show(req, res) {
 function post(req, res) {
 
     // save data from req.body
-    const { totalPrice, fullName, email, phoneNumber, address, zipCode, country } = req.body;
+    const { totalPrice, fullName, email, phoneNumber, address, zipCode, country, cart } = req.body;
+
+
+    if (!cart || cart.length === 0) {
+        return res.status(400).json({ error: 'Il carrello è vuoto' });
+    }
 
     // create query: send order
     const sendOrderSql = ` 
@@ -117,19 +122,32 @@ function post(req, res) {
                 return res.status(500).json({ error: 'database query failed' });
             };
 
+            // Salva l'ID dell'ordine appena creato
             const orderId = result.insertId;
             console.log(orderId);
 
+            // Prepara i dati per la tabella order_details
+            const values = cart.map((item) => [orderId, item.wine_id, item.quantity])
+            // -- Inserisce più vini nel carrello (ordine dettagliato)
+            const addDetailsOrderSql = `
+            INSERT INTO order_details(
+                order_id, 
+                wine_id, 
+                quantity
+            )
+            VALUES ?
+            `
+
+            connection.query(addDetailsOrderSql, [values], (err, result) => {
+                if (err) {
+                    console.error('Failed to insert order details:', err);
+                    return res.status(500).json({ error: 'Failed to insert order details' });
+                }
+
+                res.status(201).json({ message: 'Order added successfully', orderId });
+            });
 
 
-
-
-
-
-
-            // response: success message + 201 status
-            res.status(201);
-            res.json({ message: 'order added' }); //DA RIVEDERE PER JSON MESSAGE
         });
 };
 
@@ -143,8 +161,6 @@ module.exports = { index, show, post, modify };
 
 
 
-// -- Salva l'ID dell'ordine appena creato
-// SET @order_id = LAST_INSERT_ID();
 
 // -- Inserisce più vini nel carrello (ordine dettagliato)
 // INSERT INTO order_details (order_id, wine_id, quantity)
