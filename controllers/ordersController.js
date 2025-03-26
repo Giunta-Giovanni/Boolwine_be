@@ -115,42 +115,81 @@ function post(req, res) {
         // prepare data for order_details table
         const values = cart.map((item) => [orderId, item.wine_id, item.quantity]);
 
-        // create query: insert order details
-        const addDetailsOrderSql = `
+        const checkQuantitySql = `
+        SELECT id, quantity_in_stock 
+        FROM wines
+        WHERE id IN (${cart.map(() => '?').join(',')})
+    `;
+
+        const wineIds = cart.map(item => item.wine_id);
+
+        // execute query: check stock
+        connection.query(checkQuantitySql, wineIds, (err, stockQuantitiesResult) => {
+            if (err) {
+                console.error('Errore durante la verifica dello stock:', err);
+                return res.status(500).json({ error: 'Errore durante la verifica dello stock' });
+            }
+            console.log(stockQuantitiesResult);
+
+            let hasInsufficientStock = false
+            stockQuantitiesResult.forEach(item => {
+                const { id, quantity_in_stock } = item
+                // se la quantità corrispondente all id del vino e minore di quella richiesta dall'ordine allora errore 403 forbidden
+                // const values = cart.map((item) => [orderId, item.wine_id, item.quantity]);
+                cart.forEach(cartItem => {
+                    const { wine_id, quantity } = cartItem
+
+                    // creiamo una variabile dove salviamo un booleano true e false
+                    // se il booleano viene trasformato a true allora blocca il flusso 
+                    // altrimenti continua ed effettua il resto
+                    if (id === wine_id && quantity > quantity_in_stock) {
+                        res.status(403).json({ error: 'troppe bottiglie' })
+                        return hasInsufficientStock = true
+                    }
+                })
+
+            });
+
+            // se ritorna vero blocca il processo
+            if (hasInsufficientStock) return;
+
+            // create query: insert order details
+            const addDetailsOrderSql = `
             INSERT INTO order_details (order_id, wine_id, quantity) VALUES ?;
         `;
 
-        // execute query: insert order details
-        connection.query(addDetailsOrderSql, [values], (err, result) => {
-            if (err) {
-                console.error('failed to insert order details:', err);
-                return res.status(500).json({ error: 'failed to insert order details' });
-            }
+            // execute query: insert order details
+            connection.query(addDetailsOrderSql, [values], (err, result) => {
+                if (err) {
+                    console.error('failed to insert order details:', err);
+                    return res.status(500).json({ error: 'failed to insert order details' });
+                }
 
-            // create query: update stock
-            const updateStockSql = `
+                // create query: update stock
+                const updateStockSql = `
                 UPDATE wines 
                 JOIN order_details ON wines.id = order_details.wine_id
                 SET wines.quantity_in_stock = wines.quantity_in_stock - order_details.quantity
                 WHERE order_details.order_id = ?;
             `;
 
-            // execute query: update stock
-            connection.query(updateStockSql, [orderId], (err, result) => {
-                if (err) {
-                    console.error('failed to update stock:', err);
-                    return res.status(500).json({ error: 'failed to update stock' });
-                }
+                // execute query: update stock
+                connection.query(updateStockSql, [orderId], (err, result) => {
+                    if (err) {
+                        console.error('failed to update stock:', err);
+                        return res.status(500).json({ error: 'failed to update stock' });
+                    }
 
-                // response: success message
-                console.log('order created & stock updated');
-                res.status(201).json({ order: `order number ${orderId} created`, stock: `stock updated` });
+                    // response: success message
+                    console.log('order created & stock updated');
+                    res.status(201).json({ order: `order number ${orderId} created`, stock: `stock updated` });
+                });
             });
         });
-    });
+    }
+
+    )
 }
-
-
 
 
 function modify(req, res) {
