@@ -16,6 +16,11 @@ const errorsHandler = require('./middlewares/errorsHandler');
 // import middleware error404
 const endPointNotFound = require('./middlewares/notFound')
 
+// Importiamo CORS
+const cors = require('cors')
+
+// abilitiamo CORS per la richiesta specifica
+app.use(cors({ origin: process.env.FE_APP }))
 
 // connection with static file
 app.use(express.static('public'))
@@ -25,8 +30,6 @@ app.use(setImagePath);
 
 // Body parser registration
 app.use(express.json());
-
-
 
 //create first route
 app.get('/api/', (req, res) => { res.send('questa è la rotta home') })
