@@ -10,6 +10,7 @@ function index(req, res) {
             orders.id,
             orders.order_date,
             orders.full_name,
+            orders.total_price,
             GROUP_CONCAT(order_details.quantity) AS total_quantity,
             GROUP_CONCAT(wines.name) AS wines_names
         FROM orders
@@ -49,6 +50,7 @@ function show(req, res) {
             orders.id,
             orders.order_date,
             orders.full_name,
+            orders.total_price,
             GROUP_CONCAT(order_details.quantity) AS total_quantity,
             GROUP_CONCAT(wines.name) AS wines_names
         FROM orders
