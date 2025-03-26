@@ -200,37 +200,3 @@ function modify(req, res) {
 // EXPORT
 module.exports = { index, show, post, modify };
 
-
-
-
-
-//     // save quantity from req.body
-//     const { quantity } = req.body;
-
-
-
-
-
-//     // use query
-//     connection.query(checkWineSql, [id], (err, checkWineResult) => {
-//         if (err) {
-//             // console err
-//             console.error('database query failed:', err);
-//             // response err
-//             return res.status(500).json({ error: 'database query failed' });
-//         }
-
-//         if (checkWineResult.length === 0) {
-//             // response err if the wine does not exist
-//             return res.status(404).json({ error: 'wine not found' });
-//         }
-
-//         // save result
-//         const wine = checkWineResult[0];
-//         const currentQuantity = wine.quantity_in_stock;
-
-//         // check if the requested quantity is available
-//         if (quantity > currentQuantity) {
-//             // response err if not enough stock is available
-//             return res.status(400).json({ error: 'not enough stock available' });
-//         }
