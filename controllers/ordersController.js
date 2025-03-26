@@ -7,10 +7,7 @@ function index(req, res) {
     // create query: for both wines and their type
     const ordersSql = `
         SELECT 
-            orders.id,
-            orders.order_date,
-            orders.full_name,
-            orders.total_price,
+            orders.*,
             GROUP_CONCAT(order_details.quantity) AS total_quantity,
             GROUP_CONCAT(wines.name) AS wines_names
         FROM orders
@@ -47,10 +44,7 @@ function show(req, res) {
     // create query: to see an order_details by its id
     const orderSql = `
         SELECT 
-            orders.id,
-            orders.order_date,
-            orders.full_name,
-            orders.total_price,
+            orders.*,
             GROUP_CONCAT(order_details.quantity) AS total_quantity,
             GROUP_CONCAT(wines.name) AS wines_names
         FROM orders
@@ -82,7 +76,7 @@ function show(req, res) {
 function post(req, res) {
 
     // save data from req.body
-    const { totalPrice, fullName, email, phoneNumber, address, zipCode, country, cart } = req.body;
+    const { fullName, email, phoneNumber, address, zipCode, country, cart } = req.body;
 
     // check if cart is empty
     if (!cart || cart.length === 0) {
@@ -93,7 +87,6 @@ function post(req, res) {
     // create query: insert order
     const sendOrderSql = `
         INSERT INTO orders (
-            total_price, 
             full_name, 
             email, 
             phone_number, 
@@ -101,11 +94,11 @@ function post(req, res) {
             zip_code, 
             country
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, ?);
     `;
 
     // execute query
-    connection.query(sendOrderSql, [totalPrice, fullName, email, phoneNumber, address, zipCode, country], (err, result) => {
+    connection.query(sendOrderSql, [fullName, email, phoneNumber, address, zipCode, country], (err, result) => {
         if (err) {
             // console err
             console.error('database query failed:', err);
@@ -121,10 +114,12 @@ function post(req, res) {
 
         // create query: check stock
         const checkQuantitySql = `
-        SELECT id, quantity_in_stock 
-        FROM wines
-        WHERE id IN (${cart.map(() => '?').join(',')})
-    `;
+            SELECT 
+                id, 
+                quantity_in_stock 
+            FROM wines
+            WHERE id IN (${cart.map(() => '?').join(',')})
+        `;
 
         // find wine id
         const wineIds = cart.map(item => item.wine_id);
@@ -164,8 +159,8 @@ function post(req, res) {
 
             // create query: insert order details
             const addDetailsOrderSql = `
-            INSERT INTO order_details (order_id, wine_id, quantity) VALUES ?;
-        `;
+                INSERT INTO order_details (order_id, wine_id, quantity) VALUES ?;
+            `;
 
             // execute query
             connection.query(addDetailsOrderSql, [values], (err, result) => {
@@ -176,27 +171,68 @@ function post(req, res) {
                     return res.status(500).json({ error: 'failed to insert order details' });
                 }
 
-                // create query: update stock
-                const updateStockSql = `
-                UPDATE wines 
-                JOIN order_details ON wines.id = order_details.wine_id
-                SET wines.quantity_in_stock = wines.quantity_in_stock - order_details.quantity
-                WHERE order_details.order_id = ?;
-            `;
+                // TOTAL PRICE PROCEDURE
+                // create query: retrieve order total price
+                const totalPriceSql = `
+                    SELECT 
+                        SUM(order_details.quantity * wines.price) AS order_total_price
+                    FROM orders
+                    JOIN order_details ON order_details.order_id = orders.id
+                    JOIN wines ON wines.id = order_details.wine_id
+                    WHERE orders.id = ?
+                `;
 
                 // execute query
-                connection.query(updateStockSql, [orderId], (err, result) => {
+                connection.query(totalPriceSql, [orderId], (err, totalPriceResult) => {
                     if (err) {
                         // console err
-                        console.error('failed to update stock:', err);
+                        console.error('failed to retrieve total price:', err);
                         // response err
-                        return res.status(500).json({ error: 'failed to update stock' });
+                        return res.status(500).json({ error: 'failed to retrieve total price' });
                     }
 
-                    // console: order added & stock updated
-                    console.log('order created & stock updated');
-                    // response: order added & stock updated
-                    res.status(201).json({ order: `order number ${orderId} created`, stock: `stock updated` });
+                    // retrieve order total price
+                    const { order_total_price } = totalPriceResult[0]
+
+                    // create query: insert order total price
+                    const insertOrderTotalPrice = `
+                        UPDATE orders
+                        SET orders.total_price = ?
+                        WHERE orders.id = ?
+                    `;
+
+                    // execute query
+                    connection.query(insertOrderTotalPrice, [order_total_price, orderId], (err, result) => {
+                        if (err) {
+                            // console err
+                            console.error('failed to insert total price:', err);
+                            // response err
+                            return res.status(500).json({ error: 'failed to insert total price' });
+                        }
+
+                        // create query: update stock
+                        const updateStockSql = `
+                            UPDATE wines 
+                            JOIN order_details ON wines.id = order_details.wine_id
+                            SET wines.quantity_in_stock = wines.quantity_in_stock - order_details.quantity
+                            WHERE order_details.order_id = ?;
+                        `;
+
+                        // execute query
+                        connection.query(updateStockSql, [orderId], (err, result) => {
+                            if (err) {
+                                // console err
+                                console.error('failed to update stock:', err);
+                                // response err
+                                return res.status(500).json({ error: 'failed to update stock' });
+                            }
+
+                            // console: order added & stock updated
+                            console.log('order created & stock updated');
+                            // response: order added & stock updated
+                            res.status(201).json({ order: `order number ${orderId} created`, stock: `stock updated` });
+                        })
+                    })
                 });
             });
         });
