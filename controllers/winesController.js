@@ -26,7 +26,7 @@ function index(req, res) {
 
         if (!winesResults || winesResults.length === 0) {
             // response err
-            return res.status(404).json({ error: 'no wines found' });
+            return res.status(200).json({ error: 'no wines found' });
         }
 
         // update path image
@@ -72,7 +72,7 @@ function index(req, res) {
         // if filteredWines is empty
         if (!filteredWines || filteredWines.length === 0) {
             // response err
-            return res.status(404).json({ error: 'no matching wines' });
+            return res.status(200).json({ error: 'no matching wines' });
         }
 
         // response: all wines
@@ -105,7 +105,7 @@ function indexLimitedStock(req, res) {
         }
 
         if (!limitedStockResult || limitedStockResult.length === 0) {
-            return res.status(404).json({ error: 'no limited stock wines' });
+            return res.status(200).json({ error: 'no limited stock wines' });
         }
 
         // response: limited stock wines
@@ -140,7 +140,7 @@ function show(req, res) {
 
         if (!wineResults || wineResults.length === 0) {
             // response err
-            return res.status(404).json({ error: 'no wine found' });
+            return res.status(200).json({ error: 'no wine found' });
         }
 
         const wine = wineResults[0];
