@@ -81,11 +81,58 @@ function index(req, res) {
     });
 }
 
+// DA VEDERE DOPO
 function indexBestWines(req, res) {
+    const selectionWines = `
+    SELECT 
+        wines.*,
+        types.name AS type
+    FROM wines
+    JOIN types ON types.id = wines.type_id
+    WHERE wines.id IN (17,33,42)
+    `
 
+    connection.query(selectionWines, (err, selctionWinesResult) => {
+        if (err) {
+            // console err
+            console.error('database query failed:', err);
+            // response err
+            return res.status(500).json({ error: 'database query failed' });
+        };
+
+        // response: best wines
+        res.json(selctionWinesResult);
+    })
 }
 
+// LIMITED STOCK INDEX
+function indexLimitedStock(req, res) {
 
+    // create query: for fetch top 3 limited quantity wines
+    const limitedStockSql = `
+        SELECT 
+            wines.*,
+            types.name AS type
+        FROM wines
+        JOIN types ON types.id = wines.type_id
+        WHERE quantity_in_stock > 0 
+        ORDER BY quantity_in_stock ASC 
+        LIMIT 3
+    `;
+
+    // use query
+    connection.query(limitedStockSql, (err, limitedStockResult) => {
+        if (err) {
+            // console err
+            console.error('database query failed:', err);
+            // response err
+            return res.status(500).json({ error: 'database query failed' });
+        };
+
+        // response: best wines
+        res.json(limitedStockResult);
+    });
+}
 
 // SHOW FUNCTION
 function show(req, res) {
@@ -129,4 +176,4 @@ function show(req, res) {
 
 
 // EXPORT
-module.exports = { index, indexBestWines, show, };
+module.exports = { index, indexBestWines, indexLimitedStock, show };
