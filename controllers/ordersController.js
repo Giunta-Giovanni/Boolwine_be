@@ -136,7 +136,7 @@ function post(req, res) {
     // check if cart is empty
     if (!cart || cart.length === 0) {
         // response: cart is empty
-        return res.status(404).json({ error: 'cart is empty' });
+        return res.status(400).json({ error: 'cart is empty' });
     }
 
     // create query: insert order
@@ -202,7 +202,7 @@ function post(req, res) {
                     // check stock against order quantity
                     if (id === wine_id && quantity > quantity_in_stock) {
                         // response: requested quantity not available
-                        res.status(403).json({ error: 'requested quantity not available' });
+                        res.status(409).json({ error: 'requested quantity not available' });
                         // change state for insufficient stock
                         return hasInsufficientStock = true;
                     }
@@ -230,13 +230,13 @@ function post(req, res) {
 
                 // create query: retrieve order total price
                 const totalPriceSql = `
-                    SELECT 
-                        SUM(order_details.quantity * wines.price) AS order_total_price
-                    FROM orders
-                    JOIN order_details ON order_details.order_id = orders.id
-                    JOIN wines ON wines.id = order_details.wine_id
-                    WHERE orders.id = ?
-                `;
+                SELECT 
+                    SUM(order_details.quantity * IFNULL(wines.discount_price, wines.price)) AS order_total_price
+                FROM orders
+                JOIN order_details ON order_details.order_id = orders.id
+                JOIN wines ON wines.id = order_details.wine_id
+                WHERE orders.id = ?;
+            `;
 
                 // execute query
                 connection.query(totalPriceSql, [orderId], (err, totalPriceResult) => {
@@ -254,7 +254,7 @@ function post(req, res) {
                     const insertOrderTotalPrice = `
                         UPDATE orders
                         SET orders.total_price = ?
-                        WHERE orders.id = ?
+                        WHERE orders.id = ?;
                     `;
 
                     // execute query
