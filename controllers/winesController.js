@@ -80,6 +80,39 @@ function index(req, res) {
     });
 }
 
+// INDEX LIMITED STOCK
+function indexLimitedStock(req, res) {
+
+    // create query: to fetch the top 3 wines with the lowest stock
+    const limitedStockSql = `
+        SELECT 
+            wines.*,
+            types.name AS type
+        FROM wines
+        JOIN types ON types.id = wines.type_id
+        WHERE quantity_in_stock > 0 
+        ORDER BY quantity_in_stock ASC 
+        LIMIT 3
+    `;
+
+    // use query
+    connection.query(limitedStockSql, (err, limitedStockResult) => {
+        if (err) {
+            // console err
+            console.error('database query failed:', err);
+            // response err
+            return res.status(500).json({ error: 'database query failed' });
+        }
+
+        if (!limitedStockResult || limitedStockResult.length === 0) {
+            return res.status(404).json({ error: 'no limited stock wines' });
+        }
+
+        // response: limited stock wines
+        res.json(limitedStockResult);
+    });
+}
+
 // SHOW FUNCTION
 function show(req, res) {
 
@@ -119,40 +152,6 @@ function show(req, res) {
         res.json(wine);
     });
 }
-
-// LIMITED STOCK INDEX
-function indexLimitedStock(req, res) {
-
-    // create query: to fetch the top 3 wines with the lowest stock
-    const limitedStockSql = `
-        SELECT 
-            wines.*,
-            types.name AS type
-        FROM wines
-        JOIN types ON types.id = wines.type_id
-        WHERE quantity_in_stock > 0 
-        ORDER BY quantity_in_stock ASC 
-        LIMIT 3
-    `;
-
-    // use query
-    connection.query(limitedStockSql, (err, limitedStockResult) => {
-        if (err) {
-            // console err
-            console.error('database query failed:', err);
-            // response err
-            return res.status(500).json({ error: 'database query failed' });
-        }
-
-        if (!limitedStockResult || limitedStockResult.length === 0) {
-            return res.status(404).json({ error: 'no limited stock wines' });
-        }
-
-        // response: limited stock wines
-        res.json(limitedStockResult);
-    });
-}
-
 
 //TODO
 // DA VEDERE DOPO
