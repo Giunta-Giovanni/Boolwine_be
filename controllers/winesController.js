@@ -180,4 +180,4 @@ function indexBestWines(req, res) {
 }
 
 // EXPORT
-module.exports = { index, show, indexLimitedStock, indexBestWines };
+module.exports = { index, indexLimitedStock, indexBestWines, show };

@@ -5,17 +5,17 @@ const router = express.Router();
 // import controllers
 const winesController = require('../controllers/winesController');
 // controllers destructuring
-const { index, show, indexLimitedStock, indexBestWines } = winesController
+const { index, indexLimitedStock, indexBestWines, show } = winesController
 
 // Crud Operations
 // index
 router.get('/', index);
-// show
-router.get('/:id', show);
 // index limited stock
 router.get('/limited_stock', indexLimitedStock);
+// show
+router.get('/:id', show);
 
-// TODO
+// TODO DA SPOSTARE IN ALTO SE SI VUOLE USARE
 // index: best wines
 router.get('/best_wines', indexBestWines);
 
