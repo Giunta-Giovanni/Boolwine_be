@@ -24,7 +24,7 @@ function index(req, res) {
             return res.status(500).json({ error: 'database query failed' });
         }
 
-        if (winesResults.length === 0) {
+        if (!winesResults || winesResults.length === 0) {
             // response err
             return res.status(404).json({ error: 'no wines found' });
         }
@@ -49,7 +49,7 @@ function index(req, res) {
             filteredWines = wines.filter(wine => wine.type.toLowerCase().includes(typeQuery));
         }
 
-        // if query parameter "search" is present
+        // if query parameter 'search' is present
         if (req.query.search) {
             // set all search in lower case
             const searchQuery = req.query.search;
@@ -105,7 +105,7 @@ function show(req, res) {
             return res.status(500).json({ error: 'database query failed' });
         }
 
-        if (wineResults.length === 0) {
+        if (!wineResults || wineResults.length === 0) {
             // response err
             return res.status(404).json({ error: 'no wine found' });
         }
@@ -123,7 +123,7 @@ function show(req, res) {
 // LIMITED STOCK INDEX
 function indexLimitedStock(req, res) {
 
-    // create query: for fetch top 3 limited quantity wines
+    // create query: to fetch the top 3 wines with the lowest stock
     const limitedStockSql = `
         SELECT 
             wines.*,
@@ -144,7 +144,11 @@ function indexLimitedStock(req, res) {
             return res.status(500).json({ error: 'database query failed' });
         }
 
-        // response: best wines
+        if (!limitedStockResult || limitedStockResult.length === 0) {
+            return res.status(404).json({ error: 'no limited stock wines' });
+        }
+
+        // response: limited stock wines
         res.json(limitedStockResult);
     });
 }
