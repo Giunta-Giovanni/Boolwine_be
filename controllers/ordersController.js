@@ -77,8 +77,8 @@ function show(req, res) {
     const orderSql = `
         SELECT 
             orders.*,
-            GROUP_CONCAT(order_details.quantity) AS total_quantity,
-            GROUP_CONCAT(wines.name) AS wines_names
+            order_details.quantity,
+            wines.name AS wine_name
         FROM orders
         JOIN order_details ON orders.id = order_details.order_id
         JOIN wines ON order_details.wine_id = wines.id
@@ -99,8 +99,36 @@ function show(req, res) {
             return res.status(404).json({ error: 'no order found' });
         }
 
-        // response: order_details
-        res.json(orderResults[0]);
+        // reduce to group orders by id and accumulate items for each orders
+        const groupedOrder = orderResults.reduce((acc, order) => {
+
+            // find existing order by id
+            const existingOrder = acc.find(o => o.id === order.id);
+            if (existingOrder) {
+                // add wine and quantity to existing cart in order
+                existingOrder.cart.push({ wine_name: order.wine_name, quantity: order.quantity });
+                // else create new order with order data and cart object
+            } else {
+                acc.push({
+                    id: order.id,
+                    order_date: order.order_date,
+                    is_complete: order.is_complete,
+                    total_price: order.total_price,
+                    full_name: order.full_name,
+                    email: order.email,
+                    phone_number: order.phone_number,
+                    address: order.address,
+                    zip_code: order.zip_code,
+                    country: order.country,
+                    cart: [{ wine_name: order.wine_name, quantity: order.quantity }]
+                });
+            }
+            // return update order
+            return acc;
+        }, []);
+
+        // response: show order by id
+        res.json(groupedOrder);
     });
 }
 
