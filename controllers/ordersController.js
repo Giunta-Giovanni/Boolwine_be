@@ -226,8 +226,6 @@ function post(req, res) {
                     return res.status(500).json({ error: 'failed to insert order details' });
                 }
 
-                // TOTAL PRICE PROCEDURE
-
                 // create query: retrieve order total price
                 const totalPriceSql = `
                 SELECT 
