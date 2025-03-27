@@ -41,7 +41,7 @@ function index(req, res) {
         // create a variable to store filtered wines
         let filteredWines = wines;
 
-        // if query parameter "type" is present
+        // if query parameter 'type' is present
         if (req.query.type) {
             // set all types in lower case
             const typeQuery = req.query.type.toLowerCase();
@@ -70,7 +70,7 @@ function index(req, res) {
         }
 
         // if filteredWines is empty
-        if (filteredWines.length === 0) {
+        if (!filteredWines || filteredWines.length === 0) {
             // response err
             return res.status(404).json({ error: 'no matching wines' });
         }
