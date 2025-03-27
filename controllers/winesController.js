@@ -1,6 +1,5 @@
 // import connection
 const connection = require('../data/db');
-
 // import fuse
 const Fuse = require('fuse.js');
 
@@ -23,12 +22,12 @@ function index(req, res) {
             console.error('database query failed:', err);
             // response err
             return res.status(500).json({ error: 'database query failed' });
-        };
+        }
 
         if (winesResults.length === 0) {
             // response err
             return res.status(404).json({ error: 'no wines found' });
-        };
+        }
 
         // update path image
         const wines = winesResults.map(wine => {
@@ -48,7 +47,7 @@ function index(req, res) {
             const typeQuery = req.query.type.toLowerCase();
             // create a new array with requested type
             filteredWines = wines.filter(wine => wine.type.toLowerCase().includes(typeQuery));
-        };
+        }
 
         // if query parameter "search" is present
         if (req.query.search) {
@@ -60,7 +59,7 @@ function index(req, res) {
                 // fields to search within
                 keys: ['name', 'type'],
                 // search sensitivity (lower = more precise)
-                threshold: 0.4,
+                threshold: 0.4
             });
 
             // perform fuzzy search with Fuse.js
@@ -68,13 +67,13 @@ function index(req, res) {
 
             // extract only the 'item' objects from the results
             filteredWines = fuzzyResults.map(result => result.item);
-        };
+        }
 
         // if filteredWines is empty
         if (filteredWines.length === 0) {
             // response err
             return res.status(404).json({ error: 'no matching wines' });
-        };
+        }
 
         // response: all wines
         res.json(filteredWines);
@@ -143,7 +142,7 @@ function indexLimitedStock(req, res) {
             console.error('database query failed:', err);
             // response err
             return res.status(500).json({ error: 'database query failed' });
-        };
+        }
 
         // response: best wines
         res.json(limitedStockResult);
@@ -151,9 +150,7 @@ function indexLimitedStock(req, res) {
 }
 
 
-
-
-
+//TODO
 // DA VEDERE DOPO
 function indexBestWines(req, res) {
     const selectionWines = `
@@ -177,7 +174,6 @@ function indexBestWines(req, res) {
         res.json(selctionWinesResult);
     })
 }
-
 
 // EXPORT
 module.exports = { index, show, indexLimitedStock, indexBestWines };
