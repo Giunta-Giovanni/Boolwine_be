@@ -57,7 +57,7 @@ function index(req, res) {
             return acc;
         }, []);
 
-        // respond with the grouped orders
+        // response: grouped orders and their quantities
         res.json(groupedOrders);
     });
 }
@@ -94,16 +94,16 @@ function show(req, res) {
             return res.status(200).json({ error: 'no order found' });
         }
 
-        // reduce to group orders by id and accumulate items for each orders
+        // reduce the results to group orders by their id and accumulate items for each order
         const groupedOrder = orderResults.reduce((acc, order) => {
 
-            // find existing order by id
+            // search for an existing order by its id
             const existingOrder = acc.find(o => o.id === order.id);
             if (existingOrder) {
-                // add wine and quantity to existing cart in order
+                // if the order exists, add the wine and its quantity to the existing cart in that order
                 existingOrder.cart.push({ wine_name: order.wine_name, quantity: order.quantity });
-                // else create new order with order data and cart object
             } else {
+                // if the order doesn't exist, create a new order entry with the order data and an initial cart containing the wine
                 acc.push({
                     id: order.id,
                     order_date: order.order_date,
@@ -118,11 +118,11 @@ function show(req, res) {
                     cart: [{ wine_name: order.wine_name, quantity: order.quantity }]
                 });
             }
-            // return update order
+            // return the updated array of orders
             return acc;
         }, []);
 
-        // response: show order by id
+        // response: grouped orders and its quantities by id
         res.json(groupedOrder);
     });
 }
