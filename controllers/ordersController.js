@@ -1,6 +1,10 @@
 // import connection
 const connection = require('../data/db');
 
+
+// MOSTRA UN ARRAY DI OGGETTI ORDINE SIA IN INDEX CHE IN SHOW
+
+
 // INDEX FUNCTION
 function index(req, res) {
 
@@ -8,12 +12,11 @@ function index(req, res) {
     const ordersSql = `
         SELECT 
             orders.*,
-            GROUP_CONCAT(order_details.quantity) AS total_quantity,
-            GROUP_CONCAT(wines.name) AS wines_names
+            order_details.quantity,
+            wines.name AS wine_name
         FROM orders
         JOIN order_details ON orders.id = order_details.order_id
-        JOIN wines ON order_details.wine_id = wines.id
-        GROUP BY orders.id, orders.order_date, orders.full_name;
+        JOIN wines ON order_details.wine_id = wines.id;
     `;
 
     // execute query
@@ -23,15 +26,44 @@ function index(req, res) {
             console.error('database query failed:', err);
             // response err
             return res.status(500).json({ error: 'database query failed' });
-        }
+        };
 
         if (ordersResults.length === 0) {
             // response: empty order list
             return res.status(200).json({ message: 'empty order list' });
-        }
+        };
+
+        // reduce to group orders by id and accumulate items for each orders
+        const groupedOrders = ordersResults.reduce((acc, order) => {
+
+            // find existing order by id
+            const existingOrder = acc.find(o => o.id === order.id);
+            if (existingOrder) {
+                // add wine and quantity to existing cart in order
+                existingOrder.cart.push({ wine_name: order.wine_name, quantity: order.quantity });
+                // else create new order with order data and cart object
+            } else {
+                acc.push({
+                    id: order.id,
+                    order_date: order.order_date,
+                    is_complete: order.is_complete,
+                    total_price: order.total_price,
+                    full_name: order.full_name,
+                    email: order.email,
+                    phone_number: order.phone_number,
+                    address: order.address,
+                    zip_code: order.zip_code,
+                    country: order.country,
+                    cart: [{ wine_name: order.wine_name, quantity: order.quantity }]
+                });
+            }
+            // return update order
+            return acc;
+        }, []);
 
         // response: all orders
-        res.json(ordersResults);
+        res.json(groupedOrders);
+
     });
 }
 
@@ -172,6 +204,7 @@ function post(req, res) {
                 }
 
                 // TOTAL PRICE PROCEDURE
+
                 // create query: retrieve order total price
                 const totalPriceSql = `
                     SELECT 
