@@ -1,5 +1,8 @@
 // import connection
-const connection = require('../data/db')
+const connection = require('../data/db');
+
+// import fuse
+const Fuse = require('fuse.js');
 
 // INDEX FUNCTION
 function index(req, res) {
@@ -50,15 +53,27 @@ function index(req, res) {
         // if query parameter "search" is present
         if (req.query.search) {
             // set all search in lower case
-            const searchQuery = req.query.search.toLowerCase();
-            // create a new array with requested name or type
-            filteredWines = filteredWines.filter(wine => wine.name.toLowerCase().includes(searchQuery) || wine.type.toLowerCase().includes(searchQuery));
+            const searchQuery = req.query.search;
+
+            // fuzzy search configuration
+            const fuse = new Fuse(filteredWines, {
+                // fields to search within
+                keys: ['name', 'type'],
+                // search sensitivity (lower = more precise)
+                threshold: 0.4,
+            });
+
+            // perform fuzzy search with Fuse.js
+            const fuzzyResults = fuse.search(searchQuery);
+
+            // extract only the 'item' objects from the results
+            filteredWines = fuzzyResults.map(result => result.item);
         };
 
         // if filteredWines is empty
         if (filteredWines.length === 0) {
             // response err
-            return res.status(404).json({ error: 'no filtered wines found' });
+            return res.status(404).json({ error: 'no matching wines' });
         };
 
         // response: all wines
