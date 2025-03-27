@@ -1,14 +1,10 @@
 // import connection
 const connection = require('../data/db');
 
-
-// MOSTRA UN ARRAY DI OGGETTI ORDINE SIA IN INDEX CHE IN SHOW
-
-
 // INDEX FUNCTION
 function index(req, res) {
 
-    // create query: for both wines and their type
+    // create query: to see orders and their associated quantities
     const ordersSql = `
         SELECT 
             orders.*,
@@ -33,16 +29,16 @@ function index(req, res) {
             return res.status(200).json({ message: 'empty order list' });
         };
 
-        // reduce to group orders by id and accumulate items for each orders
+        // reduce the results to group orders by their id and accumulate items for each order
         const groupedOrders = ordersResults.reduce((acc, order) => {
 
-            // find existing order by id
+            // search for an existing order by its id
             const existingOrder = acc.find(o => o.id === order.id);
             if (existingOrder) {
-                // add wine and quantity to existing cart in order
+                // if the order exists, add the wine and its quantity to the existing cart in that order
                 existingOrder.cart.push({ wine_name: order.wine_name, quantity: order.quantity });
-                // else create new order with order data and cart object
             } else {
+                // if the order doesn't exist, create a new order entry with the order data and an initial cart containing the wine
                 acc.push({
                     id: order.id,
                     order_date: order.order_date,
@@ -57,13 +53,12 @@ function index(req, res) {
                     cart: [{ wine_name: order.wine_name, quantity: order.quantity }]
                 });
             }
-            // return update order
+            // return the updated array of orders
             return acc;
         }, []);
 
-        // response: all orders
+        // respond with the grouped orders
         res.json(groupedOrders);
-
     });
 }
 
@@ -96,7 +91,7 @@ function show(req, res) {
 
         if (orderResults.length === 0) {
             // response: no order found
-            return res.status(404).json({ error: 'no order found' });
+            return res.status(200).json({ error: 'no order found' });
         }
 
         // reduce to group orders by id and accumulate items for each orders
