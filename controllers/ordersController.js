@@ -161,7 +161,7 @@ function post(req, res) {
             return res.status(500).json({ error: 'database query failed' });
         }
 
-        // save order ID
+        // save order id
         const orderId = result.insertId;
 
         // prepare values for order_details table
@@ -188,24 +188,14 @@ function post(req, res) {
                 return res.status(500).json({ error: 'failed to check stock' });
             }
 
-            // set state for insufficient stock
-            let hasInsufficientStock = false;
-
-            // for each wine check the quantity in stock
-            stockQuantitiesResult.forEach(item => {
-                const { id, quantity_in_stock } = item;
-
-                // for each wine check the requested quantity
-                cart.forEach(cartItem => {
-                    const { wine_id, quantity } = cartItem;
-
-                    // check stock against order quantity
-                    if (id === wine_id && quantity > quantity_in_stock) {
+            // check for insufficient stock
+            const hasInsufficientStock = stockQuantitiesResult.some(item => {
+                return cart.some(cartItem => {
+                    if (item.id === cartItem.wine_id && cartItem.quantity > item.quantity_in_stock) {
                         // response: requested quantity not available
-                        res.status(409).json({ error: 'requested quantity not available' });
-                        // change state for insufficient stock
-                        return hasInsufficientStock = true;
+                        return res.status(409).json({ error: 'requested quantity not available' });
                     }
+                    return false;
                 });
             });
 
@@ -246,7 +236,7 @@ function post(req, res) {
                     }
 
                     // retrieve order total price
-                    const { order_total_price } = totalPriceResult[0]
+                    const { order_total_price } = totalPriceResult[0];
 
                     // create query: insert order total price
                     const insertOrderTotalPrice = `
@@ -264,29 +254,11 @@ function post(req, res) {
                             return res.status(500).json({ error: 'failed to insert total price' });
                         }
 
-                        // create query: update stock
-                        const updateStockSql = `
-                            UPDATE wines 
-                            JOIN order_details ON wines.id = order_details.wine_id
-                            SET wines.quantity_in_stock = wines.quantity_in_stock - order_details.quantity
-                            WHERE order_details.order_id = ?;
-                        `;
-
-                        // execute query
-                        connection.query(updateStockSql, [orderId], (err, result) => {
-                            if (err) {
-                                // console err
-                                console.error('failed to update stock:', err);
-                                // response err
-                                return res.status(500).json({ error: 'failed to update stock' });
-                            }
-
-                            // console: order added & stock updated
-                            console.log('order created & stock updated');
-                            // response: order added & stock updated
-                            res.status(201).json({ order: `order number ${orderId} created`, stock: `stock updated` });
-                        })
-                    })
+                        // console: order created
+                        console.log('order created');
+                        // response: order added
+                        res.status(201).json({ order: `order number ${orderId} created`, orderId: orderId });
+                    });
                 });
             });
         });
@@ -295,7 +267,70 @@ function post(req, res) {
 
 // UPDATE FUNCTION
 function modify(req, res) {
-    res.send('this is the modify route for the order');
+
+    // save id from req.params
+    const { id } = req.params;
+
+    // check stock availability
+    const checkStockSql = `
+        SELECT wines.id, wines.quantity_in_stock, order_details.quantity 
+        FROM wines
+        JOIN order_details ON wines.id = order_details.wine_id
+        WHERE order_details.order_id = ?;
+    `;
+
+    // execute check stock query
+    connection.query(checkStockSql, [id], (err, stockCheckResult) => {
+        if (err) {
+            // console err
+            console.error('failed to check stock:', err);
+            // response err
+            return res.status(500).json({ error: 'failed to check stock' });
+        }
+
+        // check if stock is still sufficient
+        for (let i = 0; i < stockCheckResult.length; i++) {
+            const item = stockCheckResult[i];
+            if (item.quantity_in_stock < item.quantity) {
+                // response: quantity non available anymore
+                return res.status(409).json({ error: 'requested quantity not available' });
+            }
+        }
+
+        // create query: update stock
+        const updateStockSql = `
+            UPDATE wines 
+            JOIN order_details ON wines.id = order_details.wine_id
+            SET wines.quantity_in_stock = wines.quantity_in_stock - order_details.quantity
+            WHERE order_details.order_id = ?;
+        `;
+
+        // execute update stock query
+        connection.query(updateStockSql, [id], (err, result) => {
+            if (err) {
+                console.error('failed to update stock:', err);
+                return res.status(500).json({ error: 'failed to update stock' });
+            }
+
+            // create query: update order status
+            const updateOrderStatus = `
+                UPDATE orders
+                SET orders.is_complete = 1
+                WHERE id = ?;
+            `;
+
+            // execute update order status query
+            connection.query(updateOrderStatus, [id], (err, result) => {
+                if (err) {
+                    console.error('failed to update order status', err);
+                    return res.status(500).json({ error: 'failed to update order status' });
+                }
+
+                // response: order completed
+                res.status(201).json({ order: `order number ${id} completed` });
+            });
+        });
+    });
 }
 
 // EXPORT
