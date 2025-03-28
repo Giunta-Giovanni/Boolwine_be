@@ -108,8 +108,17 @@ function indexLimitedStock(req, res) {
             return res.status(200).json({ error: 'no limited stock wines' });
         }
 
+        // update path image
+        const wines = limitedStockResult.map(wine => {
+            wine.image = wine.image ? `${req.imagePath}${wine.image}` : "";
+            return {
+                ...wine,
+                image: wine.image
+            };
+        });
+
         // response: limited stock wines
-        res.json(limitedStockResult);
+        res.json(wines);
     });
 }
 
@@ -173,8 +182,17 @@ function indexBestWines(req, res) {
             return res.status(500).json({ error: 'database query failed' });
         };
 
+        // update path image
+        const wines = selectionWines.map(wine => {
+            wine.image = wine.image ? `${req.imagePath}${wine.image}` : "";
+            return {
+                ...wine,
+                image: wine.image
+            };
+        });
+
         // response: best wines
-        res.json(selctionWinesResult);
+        res.json(wines);
     })
 }
 
