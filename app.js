@@ -7,6 +7,7 @@ const port = process.env.PORT;
 // import Routers
 const winesRouter = require('./routes/winesRouter');
 const ordersRouter = require('./routes/ordersRouter');
+const stripesRouter = require('./routes/stripesRouter');
 
 // MIDDLEWARES
 // import middleware imagePath
@@ -37,6 +38,8 @@ app.get('/api/', (req, res) => { res.send('questa è la rotta home') })
 //activate routes
 app.use('/api/wines', winesRouter);
 app.use('/api/orders', ordersRouter);
+app.use('/api/stripes', stripesRouter);
+
 
 // registro errore 404
 app.use(endPointNotFound);
