@@ -1,5 +1,6 @@
 // import connection
 const connection = require('../data/db');
+const nodemailer = require('nodemailer');
 
 // INDEX FUNCTION
 function index(req, res) {
@@ -281,12 +282,61 @@ function post(req, res) {
                                 return res.status(500).json({ error: 'failed to update stock' });
                             }
 
-                            // console: order added & stock updated
-                            console.log('order created & stock updated');
-                            // response: order added & stock updated
-                            res.status(201).json({ order: `order number ${orderId} created`, stock: 'stock updated' });
-                        })
-                    })
+                            // create query: retrieve order email
+                            const retrieveEmailSql = `
+                            SELECT email 
+                            FROM orders
+                            WHERE id = ?`;
+
+                            // execute query
+                            connection.query(retrieveEmailSql, [orderId], (err, result) => {
+                                if (err) {
+                                    // console err
+                                    console.error('failed to retrieve email:', err);
+                                    // response err
+                                    return res.status(500).json({ error: 'failed to retrieve email' });
+                                }
+
+                                // retrieve order email
+                                const customerEmail = result[0].email;
+
+                                // NODEMAILER
+                                const transporter = nodemailer.createTransport({
+                                    host: 'smtp.libero.it',
+                                    port: 465,
+                                    secure: true,
+                                    auth: {
+                                        user: 'cantinebooleane@libero.it',
+                                        pass: process.env.EMAIL_PW,
+                                    },
+                                    tls: {
+                                        rejectUnauthorized: false,
+                                    }
+                                });
+
+                                const mailInfo = {
+                                    from: 'cantinebooleane@libero.it',
+                                    to: customerEmail,
+                                    subject: `Conferma Ordine #${orderId}`,
+                                    text: `Grazie per il tuo ordine, ${fullName}! Il tuo ordine #${orderId} è stato ricevuto. Totale: €${order_total_price}. Riceverai una conferma di aavvenuta spedizione. Grazie per aver comprato da noi. Cantine Booleane.`,
+                                };
+
+                                transporter.sendMail(mailInfo, (err, info) => {
+                                    if (err) {
+                                        // console err
+                                        console.error('failed to send confirmation email:', err);
+                                    } else {
+                                        // console succ
+                                        console.log('confirmation email sent:', info.response);
+                                    }
+                                });
+
+                                // success response
+                                console.log('order created & stock updated');
+                                res.status(201).json({ order: `order number ${orderId} created`, stock: 'stock updated', email: 'confirmation sent' });
+                            });
+                        });
+                    });
                 });
             });
         });
