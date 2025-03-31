@@ -229,12 +229,12 @@ function post(req, res) {
 
                 // create query: retrieve order total price
                 const totalPriceSql = `
-                    SELECT 
-                        SUM(order_details.quantity * wines.price) AS order_total_price
-                    FROM orders
-                    JOIN order_details ON order_details.order_id = orders.id
-                    JOIN wines ON wines.id = order_details.wine_id
-                    WHERE orders.id = ?
+                SELECT 
+                    SUM(order_details.quantity * IFNULL(wines.discount_price, wines.price)) AS order_total_price
+                FROM orders
+                JOIN order_details ON order_details.order_id = orders.id
+                JOIN wines ON wines.id = order_details.wine_id
+                WHERE orders.id = ?;
                 `;
 
                 // execute query
@@ -282,59 +282,67 @@ function post(req, res) {
                                 return res.status(500).json({ error: 'failed to update stock' });
                             }
 
-                            // create query: retrieve order email
-                            const retrieveEmailSql = `
-                            SELECT email 
-                            FROM orders
-                            WHERE id = ?`;
+                            // STRIPE -------------------
+                            // NODEMAILER
+                            const transporter = nodemailer.createTransport({
+                                host: 'smtp.libero.it',
+                                port: 465,
+                                secure: true,
+                                auth: {
+                                    user: 'cantinebooleane@libero.it',
+                                    pass: process.env.EMAIL_PW,
+                                },
+                                tls: {
+                                    rejectUnauthorized: false,
+                                }
+                            });
 
-                            // execute query
-                            connection.query(retrieveEmailSql, [orderId], (err, result) => {
+
+                            // user confirmation email
+                            const userMail = {
+                                from: 'cantinebooleane@libero.it',
+                                to: email,
+                                subject: `Conferma Ordine #${orderId}`,
+                                text:
+                                    `Grazie per il tuo ordine, ${fullName}!
+Il tuo ordine #${orderId} è stato ricevuto.
+Totale: €${order_total_price}.
+Riceverai l'ordine in: ${address}, ${zipCode}, ${country}.
+Grazie per aver comprato da noi.
+Team di Cantine Booleane.`,
+                            };
+
+                            transporter.sendMail(userMail, (err, info) => {
                                 if (err) {
                                     // console err
-                                    console.error('failed to retrieve email:', err);
-                                    // response err
-                                    return res.status(500).json({ error: 'failed to retrieve email' });
+                                    console.error('failed to send confirmation email:', err);
+                                } else {
+                                    // console succ
+                                    console.log('confirmation email sent:', info.response);
                                 }
-
-                                // retrieve order email
-                                const customerEmail = result[0].email;
-
-                                // NODEMAILER
-                                const transporter = nodemailer.createTransport({
-                                    host: 'smtp.libero.it',
-                                    port: 465,
-                                    secure: true,
-                                    auth: {
-                                        user: 'cantinebooleane@libero.it',
-                                        pass: process.env.EMAIL_PW,
-                                    },
-                                    tls: {
-                                        rejectUnauthorized: false,
-                                    }
-                                });
-
-                                const mailInfo = {
-                                    from: 'cantinebooleane@libero.it',
-                                    to: customerEmail,
-                                    subject: `Conferma Ordine #${orderId}`,
-                                    text: `Grazie per il tuo ordine, ${fullName}! Il tuo ordine #${orderId} è stato ricevuto. Totale: €${order_total_price}. Riceverai una conferma di aavvenuta spedizione. Grazie per aver comprato da noi. Cantine Booleane.`,
-                                };
-
-                                transporter.sendMail(mailInfo, (err, info) => {
-                                    if (err) {
-                                        // console err
-                                        console.error('failed to send confirmation email:', err);
-                                    } else {
-                                        // console succ
-                                        console.log('confirmation email sent:', info.response);
-                                    }
-                                });
-
-                                // success response
-                                console.log('order created & stock updated');
-                                res.status(201).json({ order: `order number ${orderId} created`, stock: 'stock updated', email: 'confirmation sent' });
                             });
+
+                            const officeMail = {
+                                from: 'cantinebooleane@libero.it',
+                                to: 'cantinebooleane@libero.it',
+                                subject: `Conferma Ordine #${orderId}`,
+                                text: `L'ordine di ${fullName}, telefono n. ${phoneNumber}, è stato confermato! Indirizzo di spedizione: ${address}, ${zipCode}, ${country}. Totale: €${order_total_price}.`,
+                            }
+
+                            // office confirmation email
+                            transporter.sendMail(officeMail, (err, info) => {
+                                if (err) {
+                                    // console err
+                                    console.error('failed to send confirmation email:', err);
+                                } else {
+                                    // console succ
+                                    console.log('confirmation email sent:', info.response);
+                                }
+                            });
+
+                            // success response
+                            console.log('order created & stock updated');
+                            res.status(201).json({ order: `order number ${orderId} created`, stock: 'stock updated', email: 'confirmation sent' });
                         });
                     });
                 });
