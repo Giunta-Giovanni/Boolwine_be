@@ -46,7 +46,11 @@ function index(req, res) {
             // set all types in lower case
             const typeQuery = req.query.type.toLowerCase();
             // create a new array with requested type
-            filteredWines = wines.filter(wine => wine.type.toLowerCase().includes(typeQuery));
+            if (typeQuery === "discount") {
+                filteredWines = wines.filter(wine => wine.discount_price != null);
+            } else {
+                filteredWines = wines.filter(wine => wine.type.toLowerCase().includes(typeQuery));
+            }
         }
 
         // if query parameter 'search' is present
@@ -57,7 +61,7 @@ function index(req, res) {
             // fuzzy search configuration
             const fuse = new Fuse(filteredWines, {
                 // fields to search within
-                keys: ['name', 'type'],
+                keys: ['name', 'type', 'ground', 'production_year', 'food_pairing'],
                 // search sensitivity (lower = more precise)
                 threshold: 0.4
             });
