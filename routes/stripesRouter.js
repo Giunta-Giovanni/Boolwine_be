@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 // import stripe
 const Stripe = require('stripe');
-const stripe = Stripe('sk_test_51R7aTCJ44I7v7eAERBVpd8lJ9dpnO3x16HmeKrgdG1cUF3u0MMuEgFjqLJ9JtyjjXYps1VjW8O2AM10te4Tsh8kh00XiSa6Evw');
+// const stripe = Stripe('sk_test_51R7aTCJ44I7v7eAERBVpd8lJ9dpnO3x16HmeKrgdG1cUF3u0MMuEgFjqLJ9JtyjjXYps1VjW8O2AM10te4Tsh8kh00XiSa6Evw');
 
 
 // Creare una carica di esempio
