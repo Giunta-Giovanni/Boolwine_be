@@ -12,11 +12,13 @@ const { index, indexLimitedStock, indexBestWines, show } = winesController
 router.get('/', index);
 // index limited stock
 router.get('/limited_stock', indexLimitedStock);
+// index: best wines
+router.get('/best_wines', indexBestWines)
 // show
 router.get('/:id', show);
 
 // TODO DA SPOSTARE IN ALTO SE SI VUOLE USARE
 // index: best wines
-router.get('/best_wines', indexBestWines);
+// router.get('/best_wines', indexBestWines);
 
 module.exports = router;

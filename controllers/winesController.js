@@ -174,7 +174,7 @@ function indexBestWines(req, res) {
     WHERE wines.id IN (17,33,42)
     `
 
-    connection.query(selectionWines, (err, selctionWinesResult) => {
+    connection.query(selectionWines, (err, selectionWinesResult) => {
         if (err) {
             // console err
             console.error('database query failed:', err);
@@ -183,7 +183,7 @@ function indexBestWines(req, res) {
         };
 
         // update path image
-        const wines = selectionWines.map(wine => {
+        const wines = selectionWinesResult.map(wine => {
             wine.image = wine.image ? `${req.imagePath}${wine.image}` : "";
             return {
                 ...wine,
