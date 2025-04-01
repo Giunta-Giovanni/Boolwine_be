@@ -201,6 +201,39 @@ function show(req, res) {
     });
 }
 
+//TODO DA SPOSTARE!!!!!!
+// DA VEDERE DOPO
+function indexBestWines(req, res) {
+    const selectionWines = `
+    SELECT 
+        wines.*,
+        types.name AS type
+    FROM wines
+    JOIN types ON types.id = wines.type_id
+    WHERE wines.id IN (17,33,42)
+    `
+
+    connection.query(selectionWines, (err, selectionWinesResult) => {
+        if (err) {
+            // console err
+            console.error('database query failed:', err);
+            // response err
+            return res.status(500).json({ error: 'database query failed' });
+        };
+
+        // update path image
+        const wines = selectionWinesResult.map(wine => {
+            wine.image = wine.image ? `${req.imagePath}${wine.image}` : "";
+            return {
+                ...wine,
+                image: wine.image
+            };
+        });
+
+        // response: best wines
+        res.json(wines);
+    })
+}
 
 // EXPORT
 module.exports = { index, indexLimitedStock, indexWinesSelection, show };
