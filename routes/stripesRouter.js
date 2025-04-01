@@ -43,6 +43,25 @@ router.get('/', async (req, res) => {
     }
 });
 
+router.get('/v1/customers/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log('Customer id:', id);
+
+        // Recupera la sessione di checkout
+        const customer = await stripe.customers.retrieve(id);
+
+        // Verifica se la sessione esiste
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        res.json(customer);
+    } catch (error) {
+        console.error('Error retrieving Customer:', error);
+        res.status(500).send('Internal Server Error in stripe router ANDREA');
+    }
+})
 
 router.get('/v1/checkout/sessions/:sessionId', async (req, res) => {
     try {

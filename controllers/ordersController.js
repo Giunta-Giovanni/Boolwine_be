@@ -335,26 +335,26 @@ async function post(req, res) {
             const session = await stripe.checkout.sessions.create({
                 customer: customer.id,
                 payment_method_types: ['card'],
-                line_items: cart.map(item => ({
+                line_items: [{
                     price_data: {
                         currency: 'eur',
                         product_data: {
-                            name: item.wine_id,
+                            name: 'Il tuo ordine su Cantine Booleane',
                         },
-                        unit_amount: 1000,  // Adjusted for demo purposes
+                        unit_amount: order_total_price * 100, // Assumendo che `totalPrice` sia già calcolato
                     },
-                    quantity: item.quantity,
-                })),
+                    quantity: 1,
+                }],
                 mode: 'payment',
-                success_url: `http://localhost:3000/success`,
-                cancel_url: 'http://localhost:3000/cancel',
+                success_url: `http://localhost:5173/check-out-success?customer_id=${customer.id}status=confirm`,
+                cancel_url: `http://localhost:3000/check-out-success/customer_id=${customer.id}status=cancelled`,
             });
 
             // RISPOSTAAAAA
             res.json({ sessionId: session.id, url: session.url });
         } catch (error) {
             console.error('Error creating Stripe session:', error);
-            res.status(500).send('Internal Server Error in Stripe integration');
+            res.status(500).send('Internal Server Error in Stripe integration GIOVANNI');
         }
     } catch (error) {
         console.error('Error processing the request:', error);
