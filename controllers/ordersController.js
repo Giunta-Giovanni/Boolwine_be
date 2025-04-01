@@ -247,7 +247,13 @@ function post(req, res) {
                     }
 
                     // retrieve order total price
-                    const { order_total_price } = totalPriceResult[0]
+                    let { order_total_price } = totalPriceResult[0]
+
+                    // shipping discount if over 99€
+                    order_total_price = parseFloat(order_total_price);
+                    if (order_total_price <= 99) {
+                        order_total_price += 14.99;
+                    }
 
                     // create query: insert order total price
                     const insertOrderTotalPrice = `
