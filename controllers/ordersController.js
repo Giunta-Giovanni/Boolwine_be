@@ -280,7 +280,7 @@ async function post(req, res) {
         UPDATE orders
         SET orders.total_price = ?
         WHERE orders.id = ?
-    `;
+        `;
 
         // execute query
         await new Promise((resolve, reject) => {
@@ -341,13 +341,19 @@ async function post(req, res) {
                         product_data: {
                             name: 'Il tuo ordine su Cantine Booleane',
                         },
-                        unit_amount: order_total_price * 100, // Assumendo che `totalPrice` sia già calcolato
+                        unit_amount: parseFloat(order_total_price * 100),
                     },
                     quantity: 1,
                 }],
                 mode: 'payment',
-                success_url: `http://localhost:5173/check-out-success?customer_id=${customer.id}status=confirm`,
-                cancel_url: `http://localhost:3000/check-out-success/customer_id=${customer.id}status=cancelled`,
+                success_url: `http://localhost:5173/check-out-success?customer_id=${customer.id}`,
+                cancel_url: `http://localhost:3000/check-out-success/customer_id=${customer.id}`,
+                phone_number_collection: {
+                    enabled: true,
+                },
+                metadata: {
+                    orderId: orderId
+                }
             });
 
             // RISPOSTAAAAA
@@ -365,29 +371,104 @@ async function post(req, res) {
 // UPDATE FUNCTION
 function modify(req, res) {
 
-    // // save id from req.params
-    // const { id } = req.params;
+    // save id from req.params
+    const { id } = req.params;
 
-    //         // create query: update order status
-    //         const updateOrderStatus = `
-    //             UPDATE orders
-    //             SET orders.is_complete = 1
-    //             WHERE id = ?;
-    //         `;
+    // create query: update order status
+    const updateOrderStatus = `
+                UPDATE orders
+                SET orders.is_complete = "completed"
+                WHERE id = ?;
+            `;
 
-    //         // execute update order status query
-    //         connection.query(updateOrderStatus, [id], (err, result) => {
-    //             if (err) {
-    //                 console.error('failed to update order status', err);
-    //                 return res.status(500).json({ error: 'failed to update order status' });
-    //             }
+    // execute update order status query
+    connection.query(updateOrderStatus, [id], (err, result) => {
+        if (err) {
+            console.error('failed to update order status', err);
+            return res.status(500).json({ error: 'failed to update order status' });
+        }
 
-    //             // response: order completed
-    //             res.status(201).json({ order: `order number ${id} completed` });
-    //         });
-    //     });
-    // });
-}
+        // create query: retrieve order detail
+        const retrieveOrderDetail = `
+        SELECT *
+        FROM orders
+        WHERE id = ?
+        `;
+
+        // execute query
+        connection.query(retrieveOrderDetail, [id], (err, detailResult) => {
+            if (err) {
+                console.error('failed to retrieve order detail', err);
+                return res.status(500).json({ error: 'failed to retrieve order detail' });
+            }
+
+            const orderDetail = detailResult[0]
+
+            const { full_name, email, phone_number, address, zip_code, country, total_price } = orderDetail;
+
+            // NODEMAILER
+            const transporter = nodemailer.createTransport({
+                host: 'smtp.libero.it',
+                port: 465,
+                secure: true,
+                auth: {
+                    user: 'cantinebooleane@libero.it',
+                    pass: process.env.EMAIL_PW,
+                },
+                tls: {
+                    rejectUnauthorized: false,
+                }
+            });
+
+
+            // user confirmation email
+            const userMail = {
+                from: 'cantinebooleane@libero.it',
+                to: email,
+                subject: `Conferma Ordine #${id}`,
+                text:
+                    `Grazie per il tuo ordine, ${full_name}!
+            Il tuo ordine #${id} è stato ricevuto.
+            Totale: €${total_price}.
+            Riceverai l'ordine in: ${address}, ${zip_code}, ${country}.
+            Grazie per aver comprato da noi.
+            Team di Cantine Booleane.`
+            };
+
+            transporter.sendMail(userMail, (err, info) => {
+                if (err) {
+                    // console err
+                    console.error('failed to send confirmation email:', err);
+                } else {
+                    // console succ
+                    console.log('confirmation email sent:', info.response);
+                }
+            });
+
+            const officeMail = {
+                from: 'cantinebooleane@libero.it',
+                to: 'cantinebooleane@libero.it',
+                subject: `Conferma ordine # ${id}`,
+                text: `L'ordine di ${full_name}, telefono n. ${phone_number}, è stato confermato! Indirizzo di spedizione: ${address}, ${zip_code}, ${country}. Totale: €${total_price}.`
+            }
+
+            // office confirmation email
+            transporter.sendMail(officeMail, (err, info) => {
+                if (err) {
+                    // console err
+                    console.error('failed to send confirmation email:', err);
+                } else {
+                    // console succ
+                    console.log('confirmation email sent:', info.response);
+                }
+            });
+
+            // success response
+            console.log('order created & stock updated');
+            res.status(201).json({ order: `order number ${id} created`, stock: 'stock updated', email: 'confirmation sent' });
+        })
+    });
+};
 
 // EXPORT
 module.exports = { index, show, post, modify };
