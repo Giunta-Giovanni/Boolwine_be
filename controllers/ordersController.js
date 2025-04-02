@@ -574,15 +574,15 @@ function orderExpired() {
             // console.log(res.data[1].is_complete);
             const orders = res.data
             const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-            const trenta = thirtyMinutesAgo.getTime()
-            console.log('30 minuti fa:', trenta);
+            // const trenta = thirtyMinutesAgo.getTime()
+            // console.log('30 minuti fa:', trenta);
             // filtriamo sugli ordini trovati
             const pendingOrders = orders.filter(order => {
                 const orderDate = new Date(order.order_date);
-                const orario = orderDate.getTime();
-                console.log('Data ordine:', orario);
+                // const orario = orderDate.getTime();
+                // console.log('Data ordine:', orario);
                 return (
-                    order.is_complete === "pending" && trenta >= orario
+                    order.is_complete === "pending" && thirtyMinutesAgo >= orderDate
                 );
             })
             console.log(pendingOrders);
