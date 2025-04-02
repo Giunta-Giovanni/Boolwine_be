@@ -1,6 +1,9 @@
 // import connection
 const connection = require('../data/db');
 const nodemailer = require('nodemailer');
+const Stripe = require('stripe');
+const stripe = Stripe('sk_test_51R7aTCJ44I7v7eAERBVpd8lJ9dpnO3x16HmeKrgdG1cUF3u0MMuEgFjqLJ9JtyjjXYps1VjW8O2AM10te4Tsh8kh00XiSa6Evw');
+
 
 // INDEX FUNCTION
 function index(req, res) {
@@ -129,19 +132,20 @@ function show(req, res) {
 }
 
 // POST FUNCTION
-function post(req, res) {
+async function post(req, res) {
+    try {
 
-    // save data from req.body
-    const { fullName, email, phoneNumber, address, zipCode, country, cart } = req.body;
+        // save data from req.body
+        const { fullName, email, phoneNumber, address, zipCode, country, cart } = req.body;
 
-    // check if cart is empty
-    if (!cart || cart.length === 0) {
-        // response: cart is empty
-        return res.status(404).json({ error: 'cart is empty' });
-    }
+        // check if cart is empty
+        if (!cart || cart.length === 0) {
+            // response: cart is empty
+            return res.status(404).json({ error: 'cart is empty' });
+        }
 
-    // create query: insert order
-    const sendOrderSql = `
+        // create query: insert order
+        const sendOrderSql = `
         INSERT INTO orders (
             full_name, 
             email, 
@@ -153,14 +157,18 @@ function post(req, res) {
         VALUES (?, ?, ?, ?, ?, ?);
     `;
 
-    // execute query
-    connection.query(sendOrderSql, [fullName, email, phoneNumber, address, zipCode, country], (err, result) => {
-        if (err) {
-            // console err
-            console.error('database query failed:', err);
-            // response err
-            return res.status(500).json({ error: 'database query failed' });
-        }
+        // execute query
+        const result = await new Promise((resolve, reject) => {
+            connection.query(sendOrderSql, [fullName, email, phoneNumber, address, zipCode, country], (err, result) => {
+                if (err) {
+                    // console err
+                    console.error('database query failed:', err);
+                    // response err
+                    return reject('database query failed');
+                }
+                resolve(result);
+            });
+        });
 
         // save order ID
         const orderId = result.insertId;
@@ -170,219 +178,391 @@ function post(req, res) {
 
         // create query: check stock
         const checkQuantitySql = `
-            SELECT 
-                id, 
-                quantity_in_stock 
-            FROM wines
-            WHERE id IN (${cart.map(() => '?').join(',')})
-        `;
+        SELECT 
+            id, 
+            quantity_in_stock 
+        FROM wines
+        WHERE id IN (${cart.map(() => '?').join(',')})
+    `;
 
         // find wine id
         const wineIds = cart.map(item => item.wine_id);
 
         // execute query
-        connection.query(checkQuantitySql, wineIds, (err, stockQuantitiesResult) => {
-            if (err) {
-                // console err
-                console.error('failed to check stock:', err);
-                // response err
-                return res.status(500).json({ error: 'failed to check stock' });
-            }
-
-            // set state for insufficient stock
-            let hasInsufficientStock = false;
-
-            // for each wine check the quantity in stock
-            stockQuantitiesResult.forEach(item => {
-                const { id, quantity_in_stock } = item;
-
-                // for each wine check the requested quantity
-                cart.forEach(cartItem => {
-                    const { wine_id, quantity } = cartItem;
-
-                    // check stock against order quantity
-                    if (id === wine_id && quantity > quantity_in_stock) {
-                        // response: requested quantity not available
-                        res.status(403).json({ error: 'requested quantity not available' });
-                        // change state for insufficient stock
-                        return hasInsufficientStock = true;
-                    }
-                });
+        const stockQuantitiesResult = await new Promise((resolve, reject) => {
+            connection.query(checkQuantitySql, wineIds, (err, stockQuantitiesResult) => {
+                if (err) {
+                    // console err
+                    console.error('failed to check stock:', err);
+                    // response err
+                    return reject('failed to check stock');
+                }
+                resolve(stockQuantitiesResult);
             });
+        });
 
-            // if insufficient stock, stop process
-            if (hasInsufficientStock) return;
+        // set state for insufficient stock
+        let hasInsufficientStock = false;
 
-            // create query: insert order details
-            const addDetailsOrderSql = `
-                INSERT INTO order_details (order_id, wine_id, quantity) VALUES ?;
-            `;
+        // for each wine check the quantity in stock
+        stockQuantitiesResult.forEach(item => {
+            const { id, quantity_in_stock } = item;
 
-            // execute query
+            // for each wine check the requested quantity
+            cart.forEach(cartItem => {
+                const { wine_id, quantity } = cartItem;
+
+                // check stock against order quantity
+                if (id === wine_id && quantity > quantity_in_stock) {
+                    // response: requested quantity not available
+                    res.status(403).json({ error: 'requested quantity not available' });
+                    // change state for insufficient stock
+                    return hasInsufficientStock = true;
+                }
+            });
+        });
+
+        // if insufficient stock, stop process
+        if (hasInsufficientStock) return;
+
+        // create query: insert order details
+        const addDetailsOrderSql = `
+        INSERT INTO order_details (order_id, wine_id, quantity) VALUES ?;
+    `;
+
+        // execute query
+        await new Promise((resolve, reject) => {
             connection.query(addDetailsOrderSql, [values], (err, result) => {
                 if (err) {
                     // console err
                     console.error('failed to insert order details:', err);
                     // response err
-                    return res.status(500).json({ error: 'failed to insert order details' });
+                    return reject('failed to insert order details');
                 }
-
-                // create query: retrieve order total price
-                const totalPriceSql = `
-                SELECT 
-                    SUM(order_details.quantity * IFNULL(wines.discount_price, wines.price)) AS order_total_price
-                FROM orders
-                JOIN order_details ON order_details.order_id = orders.id
-                JOIN wines ON wines.id = order_details.wine_id
-                WHERE orders.id = ?;
-                `;
-
-                // execute query
-                connection.query(totalPriceSql, [orderId], (err, totalPriceResult) => {
-                    if (err) {
-                        // console err
-                        console.error('failed to retrieve total price:', err);
-                        // response err
-                        return res.status(500).json({ error: 'failed to retrieve total price' });
-                    }
-
-                    // retrieve order total price
-                    let { order_total_price } = totalPriceResult[0]
-
-                    // shipping discount if over 99€
-                    order_total_price = parseFloat(order_total_price);
-                    if (order_total_price <= 99) {
-                        order_total_price += 14.99;
-                    }
-
-                    // create query: insert order total price
-                    const insertOrderTotalPrice = `
-                        UPDATE orders
-                        SET orders.total_price = ?
-                        WHERE orders.id = ?
-                    `;
-
-                    // execute query
-                    connection.query(insertOrderTotalPrice, [order_total_price, orderId], (err, result) => {
-                        if (err) {
-                            // console err
-                            console.error('failed to insert total price:', err);
-                            // response err
-                            return res.status(500).json({ error: 'failed to insert total price' });
-                        }
-
-                        // create query: update stock
-                        const updateStockSql = `
-                            UPDATE wines 
-                            JOIN order_details ON wines.id = order_details.wine_id
-                            SET wines.quantity_in_stock = wines.quantity_in_stock - order_details.quantity
-                            WHERE order_details.order_id = ?;
-                        `;
-
-                        // execute query
-                        connection.query(updateStockSql, [orderId], (err, result) => {
-                            if (err) {
-                                // console err
-                                console.error('failed to update stock:', err);
-                                // response err
-                                return res.status(500).json({ error: 'failed to update stock' });
-                            }
-
-                            // STRIPE -------------------
-                            // NODEMAILER
-                            const transporter = nodemailer.createTransport({
-                                host: 'smtp.libero.it',
-                                port: 465,
-                                secure: true,
-                                auth: {
-                                    user: 'cantinebooleane@libero.it',
-                                    pass: process.env.EMAIL_PW,
-                                },
-                                tls: {
-                                    rejectUnauthorized: false,
-                                }
-                            });
-
-
-                            // user confirmation email
-                            const userMail = {
-                                from: 'cantinebooleane@libero.it',
-                                to: email,
-                                subject: `Conferma Ordine #${orderId}`,
-                                text:
-                                    `Grazie per il tuo ordine, ${fullName}!
-Il tuo ordine #${orderId} è stato ricevuto.
-Totale: €${order_total_price}.
-Riceverai l'ordine in: ${address}, ${zipCode}, ${country}.
-Grazie per aver comprato da noi.
-Team di Cantine Booleane.`,
-                            };
-
-                            transporter.sendMail(userMail, (err, info) => {
-                                if (err) {
-                                    // console err
-                                    console.error('failed to send confirmation email:', err);
-                                } else {
-                                    // console succ
-                                    console.log('confirmation email sent:', info.response);
-                                }
-                            });
-
-                            const officeMail = {
-                                from: 'cantinebooleane@libero.it',
-                                to: 'cantinebooleane@libero.it',
-                                subject: `Conferma Ordine #${orderId}`,
-                                text: `L'ordine di ${fullName}, telefono n. ${phoneNumber}, è stato confermato! Indirizzo di spedizione: ${address}, ${zipCode}, ${country}. Totale: €${order_total_price}.`,
-                            }
-
-                            // office confirmation email
-                            transporter.sendMail(officeMail, (err, info) => {
-                                if (err) {
-                                    // console err
-                                    console.error('failed to send confirmation email:', err);
-                                } else {
-                                    // console succ
-                                    console.log('confirmation email sent:', info.response);
-                                }
-                            });
-
-                            // success response
-                            console.log('order created & stock updated');
-                            res.status(201).json({ order: `order number ${orderId} created`, stock: 'stock updated', email: 'confirmation sent' });
-                        });
-                    });
-                });
+                resolve(result);
             });
         });
+
+        // create query: retrieve order total price
+        const totalPriceSql = `
+        SELECT 
+            SUM(order_details.quantity * IFNULL(wines.discount_price, wines.price)) AS order_total_price
+        FROM orders
+        JOIN order_details ON order_details.order_id = orders.id
+        JOIN wines ON wines.id = order_details.wine_id
+        WHERE orders.id = ?;
+        `;
+
+        // execute query
+        const totalPriceResult = await new Promise((resolve, reject) => {
+            connection.query(totalPriceSql, [orderId], (err, totalPriceResult) => {
+                if (err) {
+                    // console err
+                    console.error('failed to retrieve total price:', err);
+                    // response err
+                    return reject('failed to retrieve total price');
+                }
+                resolve(totalPriceResult);
+            });
+        });
+
+        // retrieve order total price
+        let { order_total_price } = totalPriceResult[0]
+
+        // shipping discount if over 99€
+        order_total_price = parseFloat(order_total_price);
+        if (order_total_price <= 99) {
+            order_total_price += 14.99;
+        }
+
+        // create query: insert order total price
+        const insertOrderTotalPrice = `
+        UPDATE orders
+        SET orders.total_price = ?
+        WHERE orders.id = ?
+        `;
+
+        // execute query
+        await new Promise((resolve, reject) => {
+            connection.query(insertOrderTotalPrice, [order_total_price, orderId], (err, result) => {
+                if (err) {
+                    // console err
+                    console.error('failed to insert total price:', err);
+                    // response err
+                    return reject('failed to insert total price');
+                }
+                resolve(result);
+            });
+        });
+
+        // create query: update stock
+        const updateStockSql = `
+        UPDATE wines 
+        JOIN order_details ON wines.id = order_details.wine_id
+        SET wines.quantity_in_stock = wines.quantity_in_stock - order_details.quantity
+        WHERE order_details.order_id = ?;
+    `;
+
+        // execute query
+        await new Promise((resolve, reject) => {
+            connection.query(updateStockSql, [orderId], (err, result) => {
+                if (err) {
+                    // console err
+                    console.error('failed to update stock:', err);
+                    // response err
+                    return reject('failed to update stock');
+                }
+                resolve(result);
+            });
+        });
+
+        // STRIPE PAYMENT INTEGRATION
+        let customer = null;
+        try {
+            customer = await stripe.customers.create({
+                email: email,
+                name: fullName,
+                phone: phoneNumber,
+                address: {
+                    line1: address,
+                    country: country,
+                    postal_code: zipCode
+                },
+            });
+            console.log('Customer created:', customer);
+
+            // Create Stripe session
+            const session = await stripe.checkout.sessions.create({
+                customer: customer.id,
+                payment_method_types: ['card'],
+                line_items: [{
+                    price_data: {
+                        currency: 'eur',
+                        product_data: {
+                            name: 'Il tuo ordine su Cantine Booleane',
+                        },
+                        unit_amount: parseFloat(order_total_price * 100),
+                    },
+                    quantity: 1,
+                }],
+                mode: 'payment',
+                success_url: `http://localhost:5173/check-out-success?customer_id=${customer.id}`,
+                cancel_url: `http://localhost:5173/check-out-success?customer_id=${customer.id}`,
+                phone_number_collection: {
+                    enabled: true,
+                },
+                metadata: {
+                    orderId: orderId,
+                }
+            });
+
+            // RISPOSTAAAAA
+            res.json({ sessionId: session.id, url: session.url });
+        } catch (error) {
+            console.error('Error creating Stripe session:', error);
+            res.status(500).send('Internal Server Error in Stripe integration GIOVANNI');
+        }
+    } catch (error) {
+        console.error('Error processing the request:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}
+
+
+// -------------------MODIFY------------------------
+// ORDER SUCCESS MOODIFY FUNCTION
+function orderSuccess(req, res) {
+
+    // save id from req.params
+    const { id } = req.params;
+
+
+    // create query: retrieve order status
+    const orderStatus = `
+    SELECT is_complete
+    FROM orders
+    WHERE id = ?
+    `;
+
+    // execute query
+    connection.query(orderStatus, [id], (err, statusResult) => {
+        if (err) {
+            console.error('failed to retrieve order status', err);
+            return res.status(500).json({ error: 'failed to retrieve order status' });
+        }
+
+        const orderStatus = statusResult[0].is_complete
+        if (orderStatus === "completed") {
+            // success response
+            console.log('order already updated');
+            return res.status(201).json({ order: `already updated`, stock: 'already updated', email: 'already sent' });
+        }
+        // create query: update order status
+        const updateOrderStatus = `
+                UPDATE orders
+                SET orders.is_complete = "completed"
+                WHERE id = ?;
+            `;
+
+        // execute update order status query
+        connection.query(updateOrderStatus, [id], (err, result) => {
+            if (err) {
+                console.error('failed to update order status', err);
+                return res.status(500).json({ error: 'failed to update order status' });
+            }
+
+            // create query: retrieve order detail
+            const retrieveOrderDetail = `
+        SELECT *
+        FROM orders
+        WHERE id = ?
+        `;
+
+            // execute query
+            connection.query(retrieveOrderDetail, [id], (err, detailResult) => {
+                if (err) {
+                    console.error('failed to retrieve order detail', err);
+                    return res.status(500).json({ error: 'failed to retrieve order detail' });
+                }
+
+                const orderDetail = detailResult[0]
+
+                const { full_name, email, phone_number, address, zip_code, country, total_price } = orderDetail;
+
+                // NODEMAILER
+                const transporter = nodemailer.createTransport({
+                    host: 'smtp.libero.it',
+                    port: 465,
+                    secure: true,
+                    auth: {
+                        user: 'cantinebooleane@libero.it',
+                        pass: process.env.EMAIL_PW,
+                    },
+                    tls: {
+                        rejectUnauthorized: false,
+                    }
+                });
+
+
+                // user confirmation email
+                const userMail = {
+                    from: 'cantinebooleane@libero.it',
+                    to: email,
+                    subject: `Conferma Ordine #${id}`,
+                    text:
+                        `Grazie per il tuo ordine, ${full_name}!
+            Il tuo ordine #${id} è stato ricevuto.
+            Totale: €${total_price}.
+            Riceverai l'ordine in: ${address}, ${zip_code}, ${country}.
+            Grazie per aver comprato da noi.
+            Team di Cantine Booleane.`
+                };
+
+                transporter.sendMail(userMail, (err, info) => {
+                    if (err) {
+                        // console err
+                        console.error('failed to send confirmation email:', err);
+                    } else {
+                        // console succ
+                        console.log('confirmation email sent:', info.response);
+                    }
+                });
+
+                const officeMail = {
+                    from: 'cantinebooleane@libero.it',
+                    to: 'cantinebooleane@libero.it',
+                    subject: `Conferma ordine # ${id}`,
+                    text: `L'ordine di ${full_name}, telefono n. ${phone_number}, è stato confermato! Indirizzo di spedizione: ${address}, ${zip_code}, ${country}. Totale: €${total_price}.`
+                }
+
+                // office confirmation email
+                transporter.sendMail(officeMail, (err, info) => {
+                    if (err) {
+                        // console err
+                        console.error('failed to send confirmation email:', err);
+                    } else {
+                        // console succ
+                        console.log('confirmation email sent:', info.response);
+                    }
+                });
+
+                // success response
+                console.log('order created & stock updated');
+                res.status(201).json({ order: `order number ${id} created`, stock: 'stock updated', email: 'confirmation sent' });
+            });
+
+        })
     });
-}
+};
 
-// UPDATE FUNCTION
-function modify(req, res) {
+// ORDER CANCELLED MODIFY FUNCTION
+function orderCancelled(req, res) {
 
-    // // save id from req.params
-    // const { id } = req.params;
+    // save id from req.params
+    const { id } = req.params;
 
-    //         // create query: update order status
-    //         const updateOrderStatus = `
-    //             UPDATE orders
-    //             SET orders.is_complete = 1
-    //             WHERE id = ?;
-    //         `;
 
-    //         // execute update order status query
-    //         connection.query(updateOrderStatus, [id], (err, result) => {
-    //             if (err) {
-    //                 console.error('failed to update order status', err);
-    //                 return res.status(500).json({ error: 'failed to update order status' });
-    //             }
+    // create query: retrieve order status
+    const orderStatus = `
+    SELECT is_complete
+    FROM orders
+    WHERE id = ?
+    `;
 
-    //             // response: order completed
-    //             res.status(201).json({ order: `order number ${id} completed` });
-    //         });
-    //     });
-    // });
-}
+    // execute query
+    connection.query(orderStatus, [id], (err, statusResult) => {
+        if (err) {
+            console.error('failed to retrieve order status', err);
+            return res.status(500).json({ error: 'failed to retrieve order status' });
+        }
+
+        const orderStatus = statusResult[0].is_complete
+        if (orderStatus === "cancelled") {
+            // success response
+            console.log('order already updated');
+            return res.status(201).json({ order: `already updated`, stock: 'already updated' });
+        }
+
+        // create query: update order status
+        const updateOrderStatus = `
+                UPDATE orders
+                SET orders.is_complete = "cancelled"
+                WHERE id = ?;
+            `;
+
+        // execute update order status query
+        connection.query(updateOrderStatus, [id], (err, result) => {
+            if (err) {
+                console.error('failed to update order status', err);
+                return res.status(500).json({ error: 'failed to update order status' });
+            }
+
+
+            // create query: retrieve order detail
+            const restockOrderQuantity = `
+            UPDATE wines
+            JOIN order_details ON wines.id = order_details.wine_id
+            JOIN orders ON orders.id = order_details.order_id
+            SET wines.quantity_in_stock = wines.quantity_in_stock + order_details.quantity
+            WHERE orders.id = ?;
+            `;
+
+            // execute query
+            connection.query(restockOrderQuantity, [id], (err, restockResult) => {
+                if (err) {
+                    console.error('failed to retrieve order detail', err);
+                    return res.status(500).json({ error: 'failed to retrieve order detail' });
+                }
+
+                // success response
+                console.log('order cancelled & stock restored');
+                res.status(201).json({ order: `order number ${id} cancelled`, stock: 'stock restored' });
+            });
+
+        })
+    });
+};
+
 
 // EXPORT
-module.exports = { index, show, post, modify };
+module.exports = { index, show, post, orderSuccess, orderCancelled };
