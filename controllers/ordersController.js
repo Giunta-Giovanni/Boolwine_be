@@ -347,12 +347,12 @@ async function post(req, res) {
                 }],
                 mode: 'payment',
                 success_url: `http://localhost:5173/check-out-success?customer_id=${customer.id}`,
-                cancel_url: `http://localhost:3000/check-out-success/customer_id=${customer.id}`,
+                cancel_url: `http://localhost:5173/check-out-success?customer_id=${customer.id}`,
                 phone_number_collection: {
                     enabled: true,
                 },
                 metadata: {
-                    orderId: orderId
+                    orderId: orderId,
                 }
             });
 
@@ -368,8 +368,10 @@ async function post(req, res) {
     }
 }
 
-// UPDATE FUNCTION
-function modify(req, res) {
+
+// -------------------MODIFY------------------------
+// ORDER SUCCESS MOODIFY FUNCTION
+function orderSuccess(req, res) {
 
     // save id from req.params
     const { id } = req.params;
@@ -395,7 +397,6 @@ function modify(req, res) {
             console.log('order already updated');
             return res.status(201).json({ order: `already updated`, stock: 'already updated', email: 'already sent' });
         }
-
         // create query: update order status
         const updateOrderStatus = `
                 UPDATE orders
@@ -494,5 +495,74 @@ function modify(req, res) {
     });
 };
 
+// ORDER CANCELLED MODIFY FUNCTION
+function orderCancelled(req, res) {
+
+    // save id from req.params
+    const { id } = req.params;
+
+
+    // create query: retrieve order status
+    const orderStatus = `
+    SELECT is_complete
+    FROM orders
+    WHERE id = ?
+    `;
+
+    // execute query
+    connection.query(orderStatus, [id], (err, statusResult) => {
+        if (err) {
+            console.error('failed to retrieve order status', err);
+            return res.status(500).json({ error: 'failed to retrieve order status' });
+        }
+
+        const orderStatus = statusResult[0].is_complete
+        if (orderStatus === "cancelled") {
+            // success response
+            console.log('order already updated');
+            return res.status(201).json({ order: `already updated`, stock: 'already updated' });
+        }
+
+        // create query: update order status
+        const updateOrderStatus = `
+                UPDATE orders
+                SET orders.is_complete = "cancelled"
+                WHERE id = ?;
+            `;
+
+        // execute update order status query
+        connection.query(updateOrderStatus, [id], (err, result) => {
+            if (err) {
+                console.error('failed to update order status', err);
+                return res.status(500).json({ error: 'failed to update order status' });
+            }
+
+
+            // create query: retrieve order detail
+            const restockOrderQuantity = `
+            UPDATE wines
+            JOIN order_details ON wines.id = order_details.wine_id
+            JOIN orders ON orders.id = order_details.order_id
+            SET wines.quantity_in_stock = wines.quantity_in_stock + order_details.quantity
+            WHERE orders.id = ?;
+            `;
+
+            // execute query
+            connection.query(restockOrderQuantity, [id], (err, restockResult) => {
+                if (err) {
+                    console.error('failed to retrieve order detail', err);
+                    return res.status(500).json({ error: 'failed to retrieve order detail' });
+                }
+
+                // success response
+                console.log('order cancelled & stock restored');
+                res.status(201).json({ order: `order number ${id} cancelled`, stock: 'stock restored' });
+            });
+
+        })
+    });
+};
+
+
 // EXPORT
-module.exports = { index, show, post, modify };
+module.exports = { index, show, post, orderSuccess, orderCancelled };
