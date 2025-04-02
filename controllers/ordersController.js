@@ -394,7 +394,6 @@ function modify(req, res) {
             // success response
             console.log('order already updated');
             return res.status(201).json({ order: `already updated`, stock: 'already updated', email: 'already sent' });
-
         }
 
         // create query: update order status
