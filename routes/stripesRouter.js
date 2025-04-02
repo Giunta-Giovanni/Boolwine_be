@@ -83,9 +83,6 @@ router.get('/v1/checkout/sessions/:sessionId', async (req, res) => {
     }
 })
 
-
-
-
 // sessione da creare nel momento in cui il cliente decide di comprare 
 router.post('/v1/checkout/sessions', async (req, res) => {
     let customer = null
@@ -155,7 +152,26 @@ router.post('/v1/checkout/sessions', async (req, res) => {
 });
 
 
+router.post('/v1/checkout/sessions/:sessionId/expire', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        console.log('Session ID:', sessionId);
 
+        // Recupera la sessione per verificare se esiste
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        // Modifica la sessione di checkout
+        await stripe.checkout.sessions.expire(sessionId);
+
+        res.json({ message: 'Session expired successfully', session });
+    } catch (error) {
+        console.error('Error expiring Stripe session:', error);
+        res.status(500).send('Internal Server Error in stripe router');
+    }
+});
 
 
 module.exports = router;
