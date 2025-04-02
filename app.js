@@ -9,6 +9,11 @@ const winesRouter = require('./routes/winesRouter');
 const ordersRouter = require('./routes/ordersRouter');
 const stripesRouter = require('./routes/stripesRouter');
 
+// import Controllers for background order control
+const ordersController = require('./controllers/ordersController')
+
+ordersController.startOrderChecking();
+
 // MIDDLEWARES
 // import middleware imagePath
 const setImagePath = require('./middlewares/imagePath')

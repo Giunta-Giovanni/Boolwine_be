@@ -1,6 +1,7 @@
 // import connection
 const connection = require('../data/db');
 const nodemailer = require('nodemailer');
+const axios = require('axios')
 const Stripe = require('stripe');
 const stripe = Stripe('sk_test_51R7aTCJ44I7v7eAERBVpd8lJ9dpnO3x16HmeKrgdG1cUF3u0MMuEgFjqLJ9JtyjjXYps1VjW8O2AM10te4Tsh8kh00XiSa6Evw');
 
@@ -564,5 +565,39 @@ function orderCancelled(req, res) {
 };
 
 
+// ORDER EXPIRED MODIFY FUNCTION
+function orderExpired() {
+
+    // Recupera gli ordini dalla tua API
+    axios.get('http://localhost:3000/api/orders') // Cambia con l'URL della tua API
+        .then(res => {
+            // console.log(res.data[1].is_complete);
+            const orders = res.data
+            const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+            const trenta = thirtyMinutesAgo.getTime()
+            // console.log('30 minuti fa:', trenta);
+            // filtriamo sugli ordini trovati
+            const pendingOrders = orders.filter(order => {
+                const orderDate = new Date(order.order_date);
+                const orario = orderDate.getTime();
+                // console.log('Data ordine:', orario);
+                return (
+                    order.is_complete === "pending" && orario >= trenta
+                );
+            })
+            console.log(pendingOrders);
+
+        })
+        .catch(error => {
+            console.error(' Errore nel controllo degli ordini:', error);
+        })
+}
+
+// Funzione per avviare il controllo ogni 10 secondi (o intervallo desiderato)
+function startOrderChecking() {
+    setInterval(orderExpired, 1000); // Esegui ogni 10 secondi
+}
+
+
 // EXPORT
-module.exports = { index, show, post, orderSuccess, orderCancelled };
+module.exports = { index, show, post, orderSuccess, orderCancelled, startOrderChecking };
