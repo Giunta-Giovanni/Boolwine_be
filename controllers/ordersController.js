@@ -374,98 +374,123 @@ function modify(req, res) {
     // save id from req.params
     const { id } = req.params;
 
-    // create query: update order status
-    const updateOrderStatus = `
+
+    // create query: retrieve order status
+    const orderStatus = `
+    SELECT is_complete
+    FROM orders
+    WHERE id = ?
+    `;
+
+    // execute query
+    connection.query(orderStatus, [id], (err, statusResult) => {
+        if (err) {
+            console.error('failed to retrieve order status', err);
+            return res.status(500).json({ error: 'failed to retrieve order status' });
+        }
+
+        const orderStatus = statusResult[0].is_complete
+        if (orderStatus === "completed") {
+            // success response
+            console.log('order already updated');
+            return res.status(201).json({ order: `already updated`, stock: 'already updated', email: 'already sent' });
+
+        }
+
+        // create query: update order status
+        const updateOrderStatus = `
                 UPDATE orders
                 SET orders.is_complete = "completed"
                 WHERE id = ?;
             `;
 
-    // execute update order status query
-    connection.query(updateOrderStatus, [id], (err, result) => {
-        if (err) {
-            console.error('failed to update order status', err);
-            return res.status(500).json({ error: 'failed to update order status' });
-        }
+        // execute update order status query
+        connection.query(updateOrderStatus, [id], (err, result) => {
+            if (err) {
+                console.error('failed to update order status', err);
+                return res.status(500).json({ error: 'failed to update order status' });
+            }
 
-        // create query: retrieve order detail
-        const retrieveOrderDetail = `
+            // create query: retrieve order detail
+            const retrieveOrderDetail = `
         SELECT *
         FROM orders
         WHERE id = ?
         `;
 
-        // execute query
-        connection.query(retrieveOrderDetail, [id], (err, detailResult) => {
-            if (err) {
-                console.error('failed to retrieve order detail', err);
-                return res.status(500).json({ error: 'failed to retrieve order detail' });
-            }
-
-            const orderDetail = detailResult[0]
-
-            const { full_name, email, phone_number, address, zip_code, country, total_price } = orderDetail;
-
-            // NODEMAILER
-            const transporter = nodemailer.createTransport({
-                host: 'smtp.libero.it',
-                port: 465,
-                secure: true,
-                auth: {
-                    user: 'cantinebooleane@libero.it',
-                    pass: process.env.EMAIL_PW,
-                },
-                tls: {
-                    rejectUnauthorized: false,
+            // execute query
+            connection.query(retrieveOrderDetail, [id], (err, detailResult) => {
+                if (err) {
+                    console.error('failed to retrieve order detail', err);
+                    return res.status(500).json({ error: 'failed to retrieve order detail' });
                 }
-            });
+
+                const orderDetail = detailResult[0]
+
+                const { full_name, email, phone_number, address, zip_code, country, total_price } = orderDetail;
+
+                // NODEMAILER
+                const transporter = nodemailer.createTransport({
+                    host: 'smtp.libero.it',
+                    port: 465,
+                    secure: true,
+                    auth: {
+                        user: 'cantinebooleane@libero.it',
+                        pass: process.env.EMAIL_PW,
+                    },
+                    tls: {
+                        rejectUnauthorized: false,
+                    }
+                });
 
 
-            // user confirmation email
-            const userMail = {
-                from: 'cantinebooleane@libero.it',
-                to: email,
-                subject: `Conferma Ordine #${id}`,
-                text:
-                    `Grazie per il tuo ordine, ${full_name}!
+                // user confirmation email
+                const userMail = {
+                    from: 'cantinebooleane@libero.it',
+                    to: email,
+                    subject: `Conferma Ordine #${id}`,
+                    text:
+                        `Grazie per il tuo ordine, ${full_name}!
             Il tuo ordine #${id} è stato ricevuto.
             Totale: €${total_price}.
             Riceverai l'ordine in: ${address}, ${zip_code}, ${country}.
             Grazie per aver comprato da noi.
             Team di Cantine Booleane.`
-            };
+                };
 
-            transporter.sendMail(userMail, (err, info) => {
-                if (err) {
-                    // console err
-                    console.error('failed to send confirmation email:', err);
-                } else {
-                    // console succ
-                    console.log('confirmation email sent:', info.response);
+                transporter.sendMail(userMail, (err, info) => {
+                    if (err) {
+                        // console err
+                        console.error('failed to send confirmation email:', err);
+                    } else {
+                        // console succ
+                        console.log('confirmation email sent:', info.response);
+                    }
+                });
+
+                const officeMail = {
+                    from: 'cantinebooleane@libero.it',
+                    to: 'cantinebooleane@libero.it',
+                    subject: `Conferma ordine # ${id}`,
+                    text: `L'ordine di ${full_name}, telefono n. ${phone_number}, è stato confermato! Indirizzo di spedizione: ${address}, ${zip_code}, ${country}. Totale: €${total_price}.`
                 }
+
+                // office confirmation email
+                transporter.sendMail(officeMail, (err, info) => {
+                    if (err) {
+                        // console err
+                        console.error('failed to send confirmation email:', err);
+                    } else {
+                        // console succ
+                        console.log('confirmation email sent:', info.response);
+                    }
+                });
+
+                // success response
+                console.log('order created & stock updated');
+                res.status(201).json({ order: `order number ${id} created`, stock: 'stock updated', email: 'confirmation sent' });
             });
 
-            const officeMail = {
-                from: 'cantinebooleane@libero.it',
-                to: 'cantinebooleane@libero.it',
-                subject: `Conferma ordine # ${id}`,
-                text: `L'ordine di ${full_name}, telefono n. ${phone_number}, è stato confermato! Indirizzo di spedizione: ${address}, ${zip_code}, ${country}. Totale: €${total_price}.`
-            }
-
-            // office confirmation email
-            transporter.sendMail(officeMail, (err, info) => {
-                if (err) {
-                    // console err
-                    console.error('failed to send confirmation email:', err);
-                } else {
-                    // console succ
-                    console.log('confirmation email sent:', info.response);
-                }
-            });
-
-            // success response
-            console.log('order created & stock updated');
-            res.status(201).json({ order: `order number ${id} created`, stock: 'stock updated', email: 'confirmation sent' });
         })
     });
 };
