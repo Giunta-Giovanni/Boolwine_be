@@ -595,7 +595,7 @@ function orderExpired() {
 
 // Funzione per avviare il controllo ogni 10 secondi (o intervallo desiderato)
 function startOrderChecking() {
-    setInterval(orderExpired, 1000); // Esegui ogni 10 secondi
+    setInterval(orderExpired, 1000000); // Esegui ogni 10 secondi
 }
 
 
