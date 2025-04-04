@@ -1,4 +1,4 @@
-// funzione che genera un messaggio di errore e uno stato HTTP adeguato per richieste client non valide
+// This middleware handles 404 errors for any routes that are not found
 function notFound(req, res, next) {
     res.status(404);
     res.json({
@@ -6,5 +6,5 @@ function notFound(req, res, next) {
         message: "page not found"
     })
 }
-
+// export the notFound middleware
 module.exports = notFound;
