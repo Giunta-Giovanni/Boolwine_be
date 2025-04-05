@@ -7,12 +7,12 @@ const connection = boolwine.createConnection({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME
 });
+
 // manage error
 connection.connect((err) => {
     if (err) throw err;
     console.log('connection to mysql')
-})
+});
 
 // connection export
 module.exports = connection;
-
