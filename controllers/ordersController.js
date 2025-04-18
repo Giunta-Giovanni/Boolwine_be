@@ -48,7 +48,7 @@ function index(req, res) {
                     id: order.id,
                     order_date: order.order_date,
                     is_complete: order.is_complete,
-                    total_price: order.total_price,
+                    total_price: order.total_price || 0,
                     full_name: order.full_name,
                     email: order.email,
                     phone_number: order.phone_number,
@@ -567,25 +567,100 @@ function orderCancelled(req, res) {
 
 // ORDER EXPIRED MODIFY FUNCTION
 function orderExpired() {
+    console.log('sto aggiornando il database')
+
+    // trova gli ordini nulli
+    const findNullOrders = `
+        SELECT * 
+        FROM orders
+        WHERE total_price IS null
+    `
+
+    connection.query(findNullOrders, (err, result) => {
+        if (err) {
+            console.error('failed to find null order', err);
+            return res.status(500).json({ error: 'failed to find null order' });
+        }
+        // salviamoci il risukltato in una costante ordini nulli
+        const nullOrders = result
+
+        // salviamoci i singoli id
+        const idNullOrders = nullOrders.map(order => order.id)
+        if (!!idNullOrders.length) {
+            const dropNullOrders = `
+                DELETE FROM orders
+                WHERE id IN (?);
+            `
+            // eliminiamo gli ordini nulli
+            connection.query(dropNullOrders, [idNullOrders], (err, result) => {
+                if (err) {
+                    console.error('failed to drop null orders', err);
+                    return res.status(500).json({ error: 'failed to drop null orders' });
+                }
+            })
+        }
+
+    })
+
+
 
     // Recupera gli ordini dalla tua API
-    axios.get('http://localhost:3000/api/orders') // Cambia con l'URL della tua API
+    axios.get('http://localhost:3000/api/orders')
         .then(res => {
-            // console.log(res.data[1].is_complete);
             const orders = res.data
             const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-            // const trenta = thirtyMinutesAgo.getTime()
-            // console.log('30 minuti fa:', trenta);
+
             // filtriamo sugli ordini trovati
             const pendingOrders = orders.filter(order => {
                 const orderDate = new Date(order.order_date);
-                // const orario = orderDate.getTime();
-                // console.log('Data ordine:', orario);
                 return (
-                    order.is_complete === "pending" && thirtyMinutesAgo >= orderDate
+                    (order.is_complete === "pending" && thirtyMinutesAgo >= orderDate)
                 );
             })
-            console.log(pendingOrders);
+            // console.log('questi sono i pending orders', pendingOrders);
+
+            const pendingOrdersId = pendingOrders.map(order => order.id)
+            // console.log(id)
+
+            // create query: update order status
+            if (pendingOrdersId.length > 0) {
+                const updateOrderStatus = `
+                UPDATE orders
+                SET orders.is_complete = "cancelled"
+                WHERE id IN (?);
+            `;
+
+                connection.query(updateOrderStatus, [pendingOrdersId], (err, result) => {
+                    if (err) {
+                        console.error('failed to retrieve order detail', err);
+                        return res.status(500).json({ error: 'failed to retrieve order detail' });
+                    }
+                    // success response
+                    console.log('order cancelled & stock restored');
+                    // return res.status(201).json({ order: `order number ${id} cancelled`, stock: 'stock restored' })
+                })
+
+                // create query: retrieve order detail
+                const restockOrderQuantity = `
+                    UPDATE wines
+                    JOIN order_details ON wines.id = order_details.wine_id
+                    JOIN orders ON orders.id = order_details.order_id
+                    SET wines.quantity_in_stock = wines.quantity_in_stock + order_details.quantity
+                    WHERE orders.id IN (?);
+                    `;
+
+                // execute query
+                connection.query(restockOrderQuantity, [pendingOrdersId], (err, restockResult) => {
+                    if (err) {
+                        console.error('failed to retrieve order detail', err);
+                        return res.status(500).json({ error: 'failed to retrieve order detail' });
+                    }
+
+                    // success response
+                    console.log('order cancelled & stock restored');
+                    res.status(201).json({ order: `order number ${id} cancelled`, stock: 'stock restored' });
+                });
+            }
 
         })
         .catch(error => {
@@ -595,11 +670,9 @@ function orderExpired() {
 
 // Funzione per avviare il controllo ogni 10 secondi (o intervallo desiderato)
 function startOrderChecking() {
-    setInterval(orderExpired, 1000000); // Esegui ogni 10 secondi
+    setInterval(orderExpired, 300000); // Esegui ogni 30 minuti
 }
 
 
 // EXPORT
 module.exports = { index, show, post, orderSuccess, orderCancelled, startOrderChecking }
-
-// - 38, 411, 541
