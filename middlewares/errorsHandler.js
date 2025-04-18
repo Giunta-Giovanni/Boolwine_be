@@ -1,9 +1,9 @@
-// funzione che se viene generato un errore si occupa di rispondere con un messaggio e uno status appropriato.
-function errorsHandler(err, req, res, next){
+// This middleware handles 500 errors for any routes that encounter an error
+function errorsHandler(err, req, res, next) {
     res.status(500)
-    res.json({ 
+    res.json({
         error: err.message,
     })
 }
-// esportiamo la funzione
+// export the errorsHandler middleware
 module.exports = errorsHandler;

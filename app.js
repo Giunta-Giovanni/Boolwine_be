@@ -1,60 +1,56 @@
 // import express
 const express = require('express');
-//inizialize express
 const app = express();
-//port
 const port = process.env.PORT;
+
 // import Routers
 const winesRouter = require('./routes/winesRouter');
 const ordersRouter = require('./routes/ordersRouter');
 const stripesRouter = require('./routes/stripesRouter');
 
-// import Controllers for background order control
-const ordersController = require('./controllers/ordersController')
-
+// import Controllers
+const ordersController = require('./controllers/ordersController');
+// import for background task
 ordersController.startOrderChecking();
 
 // MIDDLEWARES
 // import middleware imagePath
-const setImagePath = require('./middlewares/imagePath')
-// import middleware errore 500
+const setImagePath = require('./middlewares/imagePath');
+// import middleware error 500
 const errorsHandler = require('./middlewares/errorsHandler');
-// import middleware error404
-const endPointNotFound = require('./middlewares/notFound')
+// import middleware error 404
+const endPointNotFound = require('./middlewares/notFound');
 
-// Importiamo CORS
-const cors = require('cors')
+// import CORS
+const cors = require('cors');
+// use CORS on specific port
+app.use(cors({ origin: process.env.FE_APP }));
 
-// abilitiamo CORS per la richiesta specifica
-app.use(cors({ origin: process.env.FE_APP }))
+// use express static to serve static files
+app.use(express.static('public'));
 
-// connection with static file
-app.use(express.static('public'))
-
-// create imagePath
+// use imagePath
 app.use(setImagePath);
 
-// Body parser registration
+// use express.json to parse JSON bodies
 app.use(express.json());
 
-//create first route
-app.get('/api/', (req, res) => { res.send('questa è la rotta home') })
+// home route
+app.get('/api/', (req, res) => { res.json({ message: 'Welcome to the API home' }) });
 
-//activate routes
+// add routes
 app.use('/api/wines', winesRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/stripes', stripesRouter);
 
 
-// registro errore 404
+// error 404 handling
 app.use(endPointNotFound);
-
-// registro errore 500
+// error 500 handling
 app.use(errorsHandler);
 
 
-//activate server
+// activate server
 app.listen(port, () => {
-    console.log(`Server in ascolto sulla porta: ${port}`)
-})
-
+    console.log(`server running at http://localhost:${port}`);
+});
