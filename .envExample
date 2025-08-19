@@ -1,0 +1,9 @@
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=tuapassword
+DB_NAME=boolwine_db
+DB_DIALECT=mysql
+DB_PORT=3306
+FE_APP=http://localhost:5173
+EMAIL_PW=password_email
+STRIPE_SECRET_KEY= Chiave_segreta_Stripe
